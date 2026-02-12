@@ -1,0 +1,10 @@
+[project]
+name = "coding-agent"
+version = "0.1.0"
+description = "Agent that takes tasks from an webhook and raises MRs."
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "fastapi>=0.129.0",
+    "uvicorn>=0.40.0",
+]
