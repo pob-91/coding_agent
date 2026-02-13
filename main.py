@@ -1,10 +1,17 @@
+import json
 import logging
 import os
 import sys
 
 import uvicorn
+from dotenv import load_dotenv
 from fastapi import Depends, FastAPI, Header, HTTPException, Request
 from fastapi.responses import JSONResponse
+
+from model.issue_comment import IssueComment
+from model.webhook_message import WebhookMessage
+
+load_dotenv()
 
 # Initialize logger to print to stdout
 logging.basicConfig(
@@ -16,35 +23,39 @@ logger = logging.getLogger(__name__)
 
 app = FastAPI(title="Webhook API", version="1.0.0")
 
-# Configuration: Set WEBHOOK_SECRET as environment variable for authentication
-WEBHOOK_SECRET = os.getenv("WEBHOOK_SECRET", None)
-WEBHOOK_AUTH_ENABLED = os.getenv("WEBHOOK_AUTH_ENABLED", "false").lower() == "true"
+
+AGENT_SECRET = os.getenv("AGENT_SECRET", None)
 
 
-async def verify_webhook_auth(x_webhook_secret: str | None = Header(None)):
+async def verify_webhook_auth(authorization: str | None = Header(None)):
     """
-    Verify webhook authentication using a secret token in the header.
+    Verify webhook authentication using a Bearer token in the Authorization header.
 
     To enable auth, set environment variables:
-    - WEBHOOK_AUTH_ENABLED=true
-    - WEBHOOK_SECRET=your_secret_token
+    - AGENT_SECRET=your_secret_token
 
-    The webhook client should send the secret in the 'X-Webhook-Secret' header.
+    The webhook client should send the token in the 'Authorization' header as:
+    Authorization: Bearer <token>
     """
-    if WEBHOOK_AUTH_ENABLED:
-        if not WEBHOOK_SECRET:
-            raise HTTPException(
-                status_code=500,
-                detail="Webhook authentication is enabled but WEBHOOK_SECRET is not configured",
-            )
+    if not AGENT_SECRET:
+        raise HTTPException(
+            status_code=500,
+            detail="AGENT_SECRET env var is not configured",
+        )
 
-        if not x_webhook_secret:
-            raise HTTPException(
-                status_code=401, detail="Missing X-Webhook-Secret header"
-            )
+    if not authorization:
+        raise HTTPException(status_code=401, detail="Missing Authorization header")
 
-        if x_webhook_secret != WEBHOOK_SECRET:
-            raise HTTPException(status_code=403, detail="Invalid webhook secret")
+    if not authorization.startswith("Bearer "):
+        raise HTTPException(
+            status_code=401,
+            detail="Invalid Authorization header format. Expected 'Bearer <token>'",
+        )
+
+    token = authorization[7:]  # Remove "Bearer " prefix
+
+    if token != AGENT_SECRET:
+        raise HTTPException(status_code=403, detail="Invalid bearer token")
 
     return True
 
@@ -55,55 +66,52 @@ async def root():
     return {
         "status": "ok",
         "message": "Webhook API is running",
-        "auth_enabled": WEBHOOK_AUTH_ENABLED,
     }
 
 
 @app.post("/")
 async def webhook_handler(
     request: Request,
-    authenticated: bool = Depends(verify_webhook_auth),
+    _: bool = Depends(verify_webhook_auth),
 ):
     """
     Webhook endpoint that accepts POST requests.
 
-    If authentication is enabled, include the X-Webhook-Secret header with your requests.
+    Authorization: Bearer <your_token>
     """
 
     json_data = await request.json()
 
-    if "action" not in json_data:
-        logger.warning("Recieved webhook with no action")
+    message = WebhookMessage.model_validate(json_data)
+
+    # TODO: Extend this to handle pull request comments to update existing MRs
+    if message.action != "created":
+        logger.warning(f"Recieved action that is not handled {message.action}")
         return
 
-    if json_data["action"] != "created":
-        logger.warning(f"Recieved action that is not handled {json_data['action']}")
+    issue_comment = IssueComment.model_validate(json_data)
+
+    comment = issue_comment.comment.body.strip()
+    if not comment.startswith("/agent"):
+        logger.info("Issue comment not targeted at agents.")
         return
 
-    if "issue" not in json_data or "comment" not in json_data:
-        logger.warning(
-            "Webhook body does not appear to have issue or comment info so ignoring"
-        )
-        return
+    command = comment.removeprefix("/agent")
 
-    # TODO: Get the comment and check it is /agent COMMAND
-    # Check out the code and make a branch agent/issue-number
-    # How to send the correct bit of the code and context to an Agent??? Ask Chat GPT, maybe RAG it
-    # Include instructions to read AGENTS.md and follow the instructions there
-    # Get the patch and raise it programatically
-    # Tag the MR with a correct label
-    # Comment on the issue and tag it
-    # Do the same again with comments on the PR to fix the pr (this time just change the branch)
+    logger.info(f"Handling agent command: {command}")
+
+    # Checkout FLOW.md for info on how this works
 
     return JSONResponse(status_code=200, content={"status": "ok"})
 
 
 if __name__ == "__main__":
+    # Load envs
+
     # Run the server
     port = int(os.getenv("PORT", 8000))
     host = os.getenv("HOST", "0.0.0.0")
 
     logger.info(f"Starting webhook server on {host}:{port}")
-    logger.info(f"Authentication enabled: {WEBHOOK_AUTH_ENABLED}")
 
     uvicorn.run(app, host=host, port=port)
