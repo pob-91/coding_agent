@@ -1,4 +1,3 @@
-import json
 import logging
 import os
 import sys
@@ -7,9 +6,9 @@ import uvicorn
 from dotenv import load_dotenv
 from fastapi import Depends, FastAPI, Header, HTTPException, Request
 from fastapi.responses import JSONResponse
+from git import Repo
 
-from model.issue_comment import IssueComment
-from model.webhook_message import WebhookMessage
+from model.message import IssueComment, WebhookMessage
 
 load_dotenv()
 
@@ -101,6 +100,38 @@ async def webhook_handler(
     logger.info(f"Handling agent command: {command}")
 
     # Checkout FLOW.md for info on how this works
+    # Checkout the repo
+
+    repo: Repo
+    local_path = f"/tmp/{issue_comment.repository.name}"
+    if os.path.exists(local_path):
+        repo = Repo(local_path)
+    else:
+        repo = Repo.clone_from(
+            issue_comment.repository.clone_url,
+            f"/tmp/{issue_comment.repository.name}",
+            depth=1,
+        )
+
+    # Ensure we are on the main branch
+    try:
+        repo.git.checkout("main")
+    except Exception:
+        pass  # Already on main branch
+
+    # Create initial messages to send to the model
+    # System prompt
+    with open("./system_prompt.txt") as f:
+        system_prompt = f.read()
+
+    # Repo & issue prompt
+    # Search the repo for an AGENTS.md and pass it in if it exists
+    specific_prompt = "TODO"
+
+    messages = [
+        {"role": "system", "content": system_prompt},
+        {"role": "user", "content": specific_prompt},
+    ]
 
     return JSONResponse(status_code=200, content={"status": "ok"})
 
