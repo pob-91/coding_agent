@@ -1,6 +1,8 @@
 import logging
 import os
+import shutil
 import sys
+import uuid
 
 import uvicorn
 from dotenv import load_dotenv
@@ -103,15 +105,12 @@ async def webhook_handler(
     # Checkout the repo
 
     repo: Repo
-    local_path = f"/tmp/{issue_comment.repository.name}"
-    if os.path.exists(local_path):
-        repo = Repo(local_path)
-    else:
-        repo = Repo.clone_from(
-            issue_comment.repository.clone_url,
-            f"/tmp/{issue_comment.repository.name}",
-            depth=1,
-        )
+    local_path = f"/tmp/{str(uuid.uuid4())}/{issue_comment.repository.name}"
+    repo = Repo.clone_from(
+        issue_comment.repository.clone_url,
+        local_path,
+        depth=1,
+    )
 
     # Ensure we are on the main branch
     try:
@@ -126,12 +125,21 @@ async def webhook_handler(
 
     # Repo & issue prompt
     # Search the repo for an AGENTS.md and pass it in if it exists
+
     specific_prompt = "TODO"
 
     messages = [
         {"role": "system", "content": system_prompt},
         {"role": "user", "content": specific_prompt},
     ]
+
+    # TODO: Other flow including pushing to the origin
+
+    # Delete repo
+    try:
+        shutil.rmtree(local_path)
+    except OSError as e:
+        logger.warning(f"Failed to clean up and delete repo on disk: {e.strerror}")
 
     return JSONResponse(status_code=200, content={"status": "ok"})
 
