@@ -1,3 +1,4 @@
+import json
 import logging
 import os
 import shutil
@@ -11,6 +12,7 @@ from fastapi.responses import JSONResponse
 from git import Repo
 
 from model.message import IssueComment, WebhookMessage
+from utils.file import find_file, generate_top_level_file_tree
 
 load_dotenv()
 
@@ -101,13 +103,20 @@ async def webhook_handler(
 
     logger.info(f"Handling agent command: {command}")
 
-    # Checkout FLOW.md for info on how this works
-    # Checkout the repo
+    # prep the repo url
+    url = issue_comment.repository.clone_url
+    if url.startswith("http://"):
+        url = url.removeprefix("http://")
+    elif url.startswith("https://"):
+        url = url.removeprefix("https://")
 
+    url = f"https://{os.getenv('AGENT_USERNAME')}:{os.getenv('AGENT_TOKEN')}@{url}"
+
+    # clone the repo
     repo: Repo
     local_path = f"/tmp/{str(uuid.uuid4())}/{issue_comment.repository.name}"
     repo = Repo.clone_from(
-        issue_comment.repository.clone_url,
+        url,
         local_path,
         depth=1,
     )
@@ -120,18 +129,49 @@ async def webhook_handler(
 
     # Create initial messages to send to the model
     # System prompt
-    with open("./system_prompt.txt") as f:
+    with open("./system_prompt.txt", "r") as f:
         system_prompt = f.read()
 
-    # Repo & issue prompt
-    # Search the repo for an AGENTS.md and pass it in if it exists
+    # User prompt
+    with open("./user_prompt_template.txt", "r") as f:
+        user_prompt = f.read()
 
-    specific_prompt = "TODO"
+    user_prompt = user_prompt.replace("{{repo_name}}", issue_comment.repository.name)
+
+    # geenrate the file tree
+    file_tree = generate_top_level_file_tree(local_path)
+    user_prompt = user_prompt.replace("{{file_tree}}", file_tree)
+
+    # find and read AGENTS.md
+    agents_path = find_file(local_path, "AGENTS.md")
+    if agents_path is not None:
+        logger.info("Found AGENTS.md, adding to user prompt.")
+        with open(agents_path, "r") as f:
+            agents_content = f.read()
+            user_prompt = user_prompt.replace("{{agents_md_content}}", agents_content)
+    else:
+        user_prompt = user_prompt.replace(
+            "{{agents_md_content}}", "No AGENTS.md provided."
+        )
+
+    user_prompt = user_prompt.replace("{{issue_title}}", issue_comment.issue.title)
+    user_prompt = user_prompt.replace("{{issue_body}}", issue_comment.issue.body)
+
+    agent_command = issue_comment.comment.body.strip()
+    agent_command = agent_command.removeprefix("/agent")
+    agent_command = agent_command.strip()
+    user_prompt = user_prompt.replace("{{agent_command}}", agent_command)
+
+    # NOTE: If useful can either add the most recent N comments to the user prompt or pass them all to a model to summarise
+    # and then add that the user prompt.
+    # For now just keeping it clean and relying on the issue body.
 
     messages = [
         {"role": "system", "content": system_prompt},
-        {"role": "user", "content": specific_prompt},
+        {"role": "user", "content": user_prompt},
     ]
+
+    logger.info(f"Sending initial message to agent: {json.dumps(messages)}")
 
     # TODO: Other flow including pushing to the origin
 

@@ -1,29 +1,35 @@
-from pydantic import BaseModel
-from pydantic.dataclasses import dataclass
+from pydantic import BaseModel, ConfigDict
 
 
-class MessageConfig:
-    # Allow extra fields in the JSON that aren't in the model
-    extra = "ignore"
-
-
-@dataclass(config=MessageConfig)
 class WebhookMessage(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
     action: str
 
 
-@dataclass(config=MessageConfig)
 class Comment(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
     body: str
 
 
-@dataclass(config=MessageConfig)
 class Repository(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
     name: str
     clone_url: str
 
 
-@dataclass(config=MessageConfig)
+class Issue(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
+    title: str
+    body: str
+
+
 class IssueComment(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
     comment: Comment
     repository: Repository
+    issue: Issue
