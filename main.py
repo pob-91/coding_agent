@@ -4,12 +4,15 @@ import os
 import shutil
 import sys
 import uuid
+from collections.abc import Iterable
 
 import uvicorn
 from dotenv import load_dotenv
 from fastapi import Depends, FastAPI, Header, HTTPException, Request
 from fastapi.responses import JSONResponse
 from git import Repo
+from openai import OpenAI
+from openai.resources.chat.completions.completions import ChatCompletionToolUnionParam
 
 from model.message import IssueComment, WebhookMessage
 from utils.file import find_file, generate_top_level_file_tree
@@ -26,6 +29,10 @@ logger = logging.getLogger(__name__)
 
 app = FastAPI(title="Webhook API", version="1.0.0")
 
+client = OpenAI(
+    base_url="https://openrouter.ai/api/v1",
+    api_key=os.getenv("OPEN_ROUTER_API_KEY"),
+)
 
 AGENT_SECRET = os.getenv("AGENT_SECRET", None)
 
@@ -148,7 +155,10 @@ async def webhook_handler(
         logger.info("Found AGENTS.md, adding to user prompt.")
         with open(agents_path, "r") as f:
             agents_content = f.read()
-            user_prompt = user_prompt.replace("{{agents_md_content}}", agents_content)
+            user_prompt = user_prompt.replace(
+                "{{agents_md_content}}",
+                f"START AGENTS_MD --{agents_content}-- END AGENTS_MD",
+            )
     else:
         user_prompt = user_prompt.replace(
             "{{agents_md_content}}", "No AGENTS.md provided."
@@ -170,10 +180,51 @@ async def webhook_handler(
         {"role": "system", "content": system_prompt},
         {"role": "user", "content": user_prompt},
     ]
-
     logger.info(f"Sending initial message to agent: {json.dumps(messages)}")
 
-    # TODO: Other flow including pushing to the origin
+    # calls = 0
+    # while calls < 50:
+    #     calls += 1
+
+    #     completion = client.chat.completions.create(
+    #         model=os.getenv("AGENT_MODEL", "x-ai/grok-code-fast-1"),
+    #         messages=[
+    #             {"role": "system", "content": system_prompt},
+    #             {"role": "user", "content": user_prompt},
+    #         ],
+    #         tools=[
+    #             {
+    #                 "type": "function",
+    #                 "function": {
+    #                     "name": "search",
+    #                     "description": "Search repository using regex.",
+    #                     "parameters": {
+    #                         "type": "object",
+    #                         "properties": {
+    #                             "query": {
+    #                                 "type": "string",
+    #                                 "description": "Regex pattern to search for",
+    #                             }
+    #                         },
+    #                         "required": ["query"],
+    #                         "additionalProperties": False,
+    #                     },
+    #                 },
+    #             }
+    #         ],
+    #     )
+
+    # TODO: See if there have been any function calls and execute them
+    # Then add the response to the messages
+
+    # If no function calls then the response must be a patch - break
+
+    # Checkout a branch called issue/issue-num
+    # Test applying the patch - if it works then apply otherwise fail the job
+
+    # Push to the branch
+
+    # Add comments to the issue saying error or complete e.g. AGENT_RESPONSE:
 
     # Delete repo
     try:
