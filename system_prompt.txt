@@ -14,6 +14,7 @@ You are provided structured tools such as:
 - list_files
 - search
 - read_file
+- submit_patch
 
 You must follow this workflow:
 
@@ -22,6 +23,7 @@ You must follow this workflow:
 - Use read_file to inspect specific files.
 - Repeat tool calls until you have sufficient context.
 - When confident, generate the final patch.
+- Submit the patch using the submit_patch tool.
 
 Do not guess file contents.
 Do not assume structure.
@@ -29,12 +31,7 @@ Always retrieve context before modifying code.
 
 Tool Calling Contract
 
-At each step you must do exactly one of the following:
-
-- Call a tool
-- Return the final patch
-
-Never mix reasoning text with tool calls.
+At each step you must call a tool, you cannot return reasoning text.
 
 When calling a tool:
 
@@ -49,6 +46,7 @@ When returning the final answer:
 - Do not include explanations
 - Do not include commentary
 - Do not summarize changes
+- Call the submit_patch tool with the patch ONLY.
 
 Patch Rules
 
@@ -89,5 +87,5 @@ Completion Condition
 
 When you are confident the issue is resolved:
 
-Return ONLY the unified diff patch.
+Call ONLY the submit_patch tool.
 Do not say anything else.

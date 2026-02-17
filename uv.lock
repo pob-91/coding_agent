@@ -63,6 +63,7 @@ dependencies = [
     { name = "openai" },
     { name = "pydantic" },
     { name = "python-dotenv" },
+    { name = "ripgrepy" },
     { name = "uvicorn" },
 ]
 
@@ -73,6 +74,7 @@ requires-dist = [
     { name = "openai", specifier = ">=2.21.0" },
     { name = "pydantic", specifier = ">=2.12.5" },
     { name = "python-dotenv", specifier = ">=1.2.1" },
+    { name = "ripgrepy", specifier = ">=2.2.0" },
     { name = "uvicorn", specifier = ">=0.40.0" },
 ]
 
@@ -326,6 +328,12 @@ sdist = { url = "https://files.pythonhosted.org/packages/f0/26/19cadc79a718c5edb
 wheels = [
     { url = "https://files.pythonhosted.org/packages/14/1b/a298b06749107c305e1fe0f814c6c74aea7b2f1e10989cb30f544a1b3253/python_dotenv-1.2.1-py3-none-any.whl", hash = "sha256:b81ee9561e9ca4004139c6cbba3a238c32b03e4894671e181b671e8cb8425d61", size = 21230, upload-time = "2025-10-26T15:12:09.109Z" },
 ]
+
+[[package]]
+name = "ripgrepy"
+version = "2.2.0"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/80/8a/023e7c432634a6090a26ace319a37a2a73aac8fa6a7bf142fd7b3ec8fd3b/ripgrepy-2.2.0.tar.gz", hash = "sha256:4c43c61384f257660007acd271a5d8e4abe9be0b069c418d091f7299e080ca9d", size = 31740, upload-time = "2025-07-11T01:18:01.662Z" }
 
 [[package]]
 name = "smmap"

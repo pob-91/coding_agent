@@ -4,7 +4,7 @@ import os
 import shutil
 import sys
 import uuid
-from collections.abc import Iterable
+from typing import Any, Iterable
 
 import uvicorn
 from dotenv import load_dotenv
@@ -12,7 +12,6 @@ from fastapi import Depends, FastAPI, Header, HTTPException, Request
 from fastapi.responses import JSONResponse
 from git import Repo
 from openai import OpenAI
-from openai.resources.chat.completions.completions import ChatCompletionToolUnionParam
 
 from model.message import IssueComment, WebhookMessage
 from utils.file import find_file, generate_top_level_file_tree
@@ -176,48 +175,111 @@ async def webhook_handler(
     # and then add that the user prompt.
     # For now just keeping it clean and relying on the issue body.
 
-    messages = [
+    tools: Iterable[Any] = [
+        {
+            "type": "function",
+            "name": "search",
+            "description": "Search repository using regex.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "query": {
+                        "type": "string",
+                        "description": "Regex pattern to use for search.",
+                    },
+                    "path": {
+                        "type": "string",
+                        "description": "Optional sub-path to limit the search location relative to the repo root.",
+                    },
+                },
+                "required": ["query"],
+                "additionalProperties": False,
+            },
+        },
+        {
+            "type": "function",
+            "name": "list_files",
+            "description": "List files and directories at a given path.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "path": {
+                        "type": "string",
+                        "description": "Directory path relative to repo root.",
+                    }
+                },
+                "required": ["path"],
+                "additionalProperties": False,
+            },
+        },
+        {
+            "type": "function",
+            "name": "read_file",
+            "description": "Read a portion of a file.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "path": {"type": "string"},
+                    "start_line": {"type": "integer"},
+                    "end_line": {"type": "integer"},
+                },
+                "required": ["path"],
+                "additionalProperties": False,
+            },
+        },
+        {
+            "type": "function",
+            "name": "submit_patch",
+            "description": "Submit a code patch to resolve the issue.",
+            "parameters": {"patch": "string"},
+        },
+    ]
+
+    messages: Iterable[Any] = [
         {"role": "system", "content": system_prompt},
         {"role": "user", "content": user_prompt},
     ]
     logger.info(f"Sending initial message to agent: {json.dumps(messages)}")
 
-    # calls = 0
-    # while calls < 50:
-    #     calls += 1
+    calls = 0
+    execute = True
+    while execute:
+        if calls >= 50:
+            execute = False
+            break
 
-    #     completion = client.chat.completions.create(
-    #         model=os.getenv("AGENT_MODEL", "x-ai/grok-code-fast-1"),
-    #         messages=[
-    #             {"role": "system", "content": system_prompt},
-    #             {"role": "user", "content": user_prompt},
-    #         ],
-    #         tools=[
-    #             {
-    #                 "type": "function",
-    #                 "function": {
-    #                     "name": "search",
-    #                     "description": "Search repository using regex.",
-    #                     "parameters": {
-    #                         "type": "object",
-    #                         "properties": {
-    #                             "query": {
-    #                                 "type": "string",
-    #                                 "description": "Regex pattern to search for",
-    #                             }
-    #                         },
-    #                         "required": ["query"],
-    #                         "additionalProperties": False,
-    #                     },
-    #                 },
-    #             }
-    #         ],
-    #     )
+        response = client.responses.create(
+            model=os.getenv("AGENT_MODEL", "x-ai/grok-code-fast-1"),
+            tools=tools,
+            input=messages,
+        )
 
-    # TODO: See if there have been any function calls and execute them
-    # Then add the response to the messages
+        messages.append(response.output)
 
-    # If no function calls then the response must be a patch - break
+        for item in response.output:
+            if item.type != "function_call":
+                continue
+
+            if item.name == "TODO":
+                # TODO: Go through and execute each function
+                # 4. Provide function call results to the model
+                # messages.append({
+                #     "type": "function_call_output",
+                #     "call_id": item.call_id,
+                #     "output": json.dumps({
+                #       "horoscope": horoscope
+                #     })
+                # })
+                continue
+            if item.name == "submit_patch":
+                # TODO: We are done, get the patch and test it
+                # If the patch does not work or is invalid then send an error message back to the model and continue executing
+                execute = False
+                break
+
+        calls += 1
+
+        # TODO: Maybe if the calls are getting close to 50 send a message to the model to say there are N calls left
 
     # Checkout a branch called issue/issue-num
     # Test applying the patch - if it works then apply otherwise fail the job
