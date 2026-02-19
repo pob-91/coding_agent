@@ -15,6 +15,7 @@ from openai import OpenAI
 
 from model.message import IssueComment, WebhookMessage
 from utils.file import find_file, generate_top_level_file_tree
+from utils.search import regex_search
 
 load_dotenv()
 
@@ -187,7 +188,7 @@ async def webhook_handler(
                         "type": "string",
                         "description": "Regex pattern to use for search.",
                     },
-                    "path": {
+                    "subPath": {
                         "type": "string",
                         "description": "Optional sub-path to limit the search location relative to the repo root.",
                     },
@@ -260,16 +261,36 @@ async def webhook_handler(
             if item.type != "function_call":
                 continue
 
-            if item.name == "TODO":
-                # TODO: Go through and execute each function
-                # 4. Provide function call results to the model
-                # messages.append({
-                #     "type": "function_call_output",
-                #     "call_id": item.call_id,
-                #     "output": json.dumps({
-                #       "horoscope": horoscope
-                #     })
-                # })
+            args: dict = json.loads(item.arguments)
+            logger.info(f"Calling function: {item.name}, with args: {item.arguments}")
+
+            if item.name == "search":
+                if "query" not in args:
+                    messages.append(
+                        {
+                            "type": "function_call_output",
+                            "call_id": item.call_id,
+                            "output": json.dumps(
+                                {
+                                    "error": "query argument not given to function call search"
+                                }
+                            ),
+                        }
+                    )
+                    continue
+
+                results = regex_search(
+                    local_path,
+                    args["query"],
+                    args.get("subPath", None),
+                )
+                messages.append(
+                    {
+                        "type": "function_call_output",
+                        "call_id": item.call_id,
+                        "output": json.dumps(results),
+                    }
+                )
                 continue
             if item.name == "submit_patch":
                 # TODO: We are done, get the patch and test it
