@@ -14,7 +14,8 @@ from git import Repo
 from openai import OpenAI
 
 from model.message import IssueComment, WebhookMessage
-from utils.file import find_file, generate_top_level_file_tree
+from utils.file import find_file, generate_top_level_file_tree, read_file
+from utils.repo import check_patch, checkout_and_apply_and_push
 from utils.search import regex_search
 
 load_dotenv()
@@ -188,7 +189,7 @@ async def webhook_handler(
                         "type": "string",
                         "description": "Regex pattern to use for search.",
                     },
-                    "subPath": {
+                    "sub_path": {
                         "type": "string",
                         "description": "Optional sub-path to limit the search location relative to the repo root.",
                     },
@@ -220,9 +221,18 @@ async def webhook_handler(
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "path": {"type": "string"},
-                    "start_line": {"type": "integer"},
-                    "end_line": {"type": "integer"},
+                    "path": {
+                        "type": "string",
+                        "description": "File path relative to repo root.",
+                    },
+                    "start_line": {
+                        "type": "integer",
+                        "description": "Line from which to read. Defaults to 0.",
+                    },
+                    "end_line": {
+                        "type": "integer",
+                        "description": "Line at which to stop reading. Defaults to start_line + 50.",
+                    },
                 },
                 "required": ["path"],
                 "additionalProperties": False,
@@ -232,7 +242,21 @@ async def webhook_handler(
             "type": "function",
             "name": "submit_patch",
             "description": "Submit a code patch to resolve the issue.",
-            "parameters": {"patch": "string"},
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "patch": {
+                        "type": "string",
+                        "description": "A valid git patch to apply to the repo that implements the issue.",
+                    },
+                    "commit_message": {
+                        "type": "string",
+                        "description": "An optional commit message to add when committing the patch.",
+                    },
+                },
+                "required": ["path"],
+                "additionalProperties": False,
+            },
         },
     ]
 
@@ -242,11 +266,16 @@ async def webhook_handler(
     ]
     logger.info(f"Sending initial message to agent: {json.dumps(messages)}")
 
+    patch: str = ""
+    commit_message: str | None = None
     calls = 0
     execute = True
     while execute:
         if calls >= 50:
             execute = False
+            logger.warning(
+                "Calls exceeded 50 iterations. Perhaps let the model know or increase the limit."
+            )
             break
 
         response = client.responses.create(
@@ -254,6 +283,7 @@ async def webhook_handler(
             tools=tools,
             input=messages,
         )
+        calls += 1
 
         messages.append(response.output)
 
@@ -282,7 +312,7 @@ async def webhook_handler(
                 results = regex_search(
                     local_path,
                     args["query"],
-                    args.get("subPath", None),
+                    args.get("sub_path", None),
                 )
                 messages.append(
                     {
@@ -292,20 +322,136 @@ async def webhook_handler(
                     }
                 )
                 continue
+            if item.name == "list_files":
+                if "path" not in args:
+                    messages.append(
+                        {
+                            "type": "function_call_output",
+                            "call_id": item.call_id,
+                            "output": json.dumps(
+                                {
+                                    "error": "path argument not given to function call search"
+                                }
+                            ),
+                        }
+                    )
+                    continue
+
+                results = generate_top_level_file_tree(local_path, args["path"])
+                messages.append(
+                    {
+                        "type": "function_call_output",
+                        "call_id": item.call_id,
+                        "output": json.dumps(results),
+                    }
+                )
+                continue
+            if item.name == "read_file":
+                if "path" not in args:
+                    messages.append(
+                        {
+                            "type": "function_call_output",
+                            "call_id": item.call_id,
+                            "output": json.dumps(
+                                {
+                                    "error": "path argument not given to function call search"
+                                }
+                            ),
+                        }
+                    )
+                    continue
+
+                start: int = args.get("start_line", 0)
+                end: int = args.get("end_line", -1)
+                if end == -1:
+                    end = start + 50
+
+                if start < 0:
+                    messages.append(
+                        {
+                            "type": "function_call_output",
+                            "call_id": item.call_id,
+                            "output": json.dumps(
+                                {
+                                    "error": "start_line must be >= 0",
+                                }
+                            ),
+                        }
+                    )
+                    continue
+                if start >= end:
+                    messages.append(
+                        {
+                            "type": "function_call_output",
+                            "call_id": item.call_id,
+                            "output": json.dumps(
+                                {
+                                    "error": "end_line must be > than start_line",
+                                }
+                            ),
+                        }
+                    )
+                    continue
+
+                results = read_file(
+                    local_path,
+                    args["path"],
+                    start,
+                    end,
+                )
+                messages.append(
+                    {
+                        "type": "function_call_output",
+                        "call_id": item.call_id,
+                        "output": json.dumps(results),
+                    }
+                )
+                continue
+
             if item.name == "submit_patch":
-                # TODO: We are done, get the patch and test it
+                if "patch" not in args:
+                    messages.append(
+                        {
+                            "type": "function_call_output",
+                            "call_id": item.call_id,
+                            "output": json.dumps(
+                                {
+                                    "error": "path argument not given to function call search"
+                                }
+                            ),
+                        }
+                    )
+                    continue
+
                 # If the patch does not work or is invalid then send an error message back to the model and continue executing
+                ok, e = check_patch(repo, args["patch"])
+                if not ok:
+                    messages.append(
+                        {
+                            "type": "function_call_output",
+                            "call_id": item.call_id,
+                            "output": json.dumps(
+                                {
+                                    "error": f"Invalid patch file. Error: {e}",
+                                }
+                            ),
+                        }
+                    )
+                    continue
+
+                patch = args["patch"]
+                commit_message = args.get("commit_message", None)
                 execute = False
                 break
 
-        calls += 1
-
         # TODO: Maybe if the calls are getting close to 50 send a message to the model to say there are N calls left
 
-    # Checkout a branch called issue/issue-num
-    # Test applying the patch - if it works then apply otherwise fail the job
-
-    # Push to the branch
+    checkout_and_apply_and_push(
+        repo,
+        patch,
+        issue_comment.issue.title,
+        commit_message,
+    )
 
     # Add comments to the issue saying error or complete e.g. AGENT_RESPONSE:
 
