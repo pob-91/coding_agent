@@ -30,3 +30,7 @@ compelete projects quicker.
 - Simple is better than clever, for example, several lines of if statements are better than nested terneries.
 - Follow the golden rule: negate ifs and return early where possible / use continue or break to keep nesting as low as possible.
 - Prefer minimal and secure docker base images e.g. alpine or distroless.
+
+### Agent Behaviour
+
+You should assume that the target audience for ay code patch are experienced software egineers. Do not try to do anything superflous to requirements and keep contributions small, performant and clean.
