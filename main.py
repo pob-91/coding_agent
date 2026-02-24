@@ -227,7 +227,7 @@ async def webhook_handler(
                     },
                     "start_line": {
                         "type": "integer",
-                        "description": "Line from which to read. Defaults to 0.",
+                        "description": "Line from which to read. Cannot be < 1. Defaults to 1.",
                     },
                     "end_line": {
                         "type": "integer",
@@ -254,7 +254,7 @@ async def webhook_handler(
                         "description": "An optional commit message to add when committing the patch.",
                     },
                 },
-                "required": ["path"],
+                "required": ["patch"],
                 "additionalProperties": False,
             },
         },
@@ -286,7 +286,7 @@ async def webhook_handler(
         )
         calls += 1
 
-        messages.append(response.output)
+        messages.extend(response.output)
 
         for item in response.output:
             if item.type != "function_call":
@@ -372,19 +372,19 @@ async def webhook_handler(
                     logger.warning("path not in args for read file function")
                     continue
 
-                start: int = args.get("start_line", 0)
+                start: int = args.get("start_line", 1)
                 end: int = args.get("end_line", -1)
                 if end == -1:
                     end = start + 50
 
-                if start < 0:
+                if start < 1:
                     messages.append(
                         {
                             "type": "function_call_output",
                             "call_id": item.call_id,
                             "output": json.dumps(
                                 {
-                                    "error": "start_line must be >= 0",
+                                    "error": "start_line must be >= 1",
                                 }
                             ),
                         }
@@ -441,6 +441,7 @@ async def webhook_handler(
                     continue
 
                 # If the patch does not work or is invalid then send an error message back to the model and continue executing
+                logger.info(f"Sending patch to be checked: {args['patch']}")
                 ok, e = check_patch(repo, args["patch"])
                 if not ok:
                     messages.append(

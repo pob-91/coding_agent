@@ -1,4 +1,5 @@
 import os
+import tempfile
 from typing import Tuple
 
 import requests
@@ -6,11 +7,15 @@ from git import GitCommandError, Repo
 
 
 def check_patch(repo: Repo, patch: str) -> Tuple[bool, str | None]:
+    filename: str = ""
     try:
-        repo.git.apply("--check", istream=patch)
+        filename = _write_temp_patch_file(patch)
+        repo.git.apply("--check", filename)
         return True, None
     except GitCommandError as e:
         return False, str(e)
+    finally:
+        _cleanup_temp_patch_file(filename)
 
 
 def checkout_and_apply_and_push(
@@ -20,7 +25,7 @@ def checkout_and_apply_and_push(
     commit_message: str | None,
 ) -> None:
     # checkout branch
-    prepped_title = issue_title.lower().replace(" ", "_")[:10]
+    prepped_title = issue_title.lower().replace(" ", "_")
     branch_name = f"issue/{prepped_title}"
 
     origin = repo.remotes.origin
@@ -41,7 +46,9 @@ def checkout_and_apply_and_push(
         repo.git.push("-u", "origin", branch_name)
 
     # apply patch
-    repo.git.apply("-", istream=patch)
+    filename = _write_temp_patch_file(patch)
+    repo.git.apply(filename)
+    _cleanup_temp_patch_file(filename)
 
     # stage and commit
     repo.git.add(A=True)
@@ -77,3 +84,13 @@ def comment_on_issue(
     )
 
     return response.status_code == 200
+
+
+def _write_temp_patch_file(patch: str) -> str:
+    with tempfile.NamedTemporaryFile(mode="w", delete=False, suffix=".patch") as f:
+        f.write(patch)
+        return f.name
+
+
+def _cleanup_temp_patch_file(path: str) -> None:
+    os.unlink(path)
