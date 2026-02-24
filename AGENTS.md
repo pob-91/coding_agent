@@ -30,6 +30,16 @@ compelete projects quicker.
 - Simple is better than clever, for example, several lines of if statements are better than nested terneries.
 - Follow the golden rule: negate ifs and return early where possible / use continue or break to keep nesting as low as possible.
 - Prefer minimal and secure docker base images e.g. alpine or distroless.
+- Consider performance Olog(n) is better than On. Make heavy use of sets and optimised algorithms.
+- Leave comments only when needed (e.g. # using this function as as it is optimised over for...). Good code should not need comments by and large.
+
+### Formatting
+
+When writing code please consider formatting and readability. Examples are:
+
+- Leave newlines between concepts - 20 lines of code all bunched together is not very readable. This includes Dockerfiles e.t.c.
+- Early returns - in iterations perfer control flow statements like continue to make the code more readable
+- Avoid nesting - use the "golden path" (early returns) to avoid nesting ifs e.t.c
 
 ### Agent Behaviour
 
