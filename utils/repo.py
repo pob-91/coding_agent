@@ -1,5 +1,7 @@
+import os
 from typing import Tuple
 
+import requests
 from git import GitCommandError, Repo
 
 
@@ -52,6 +54,26 @@ def checkout_and_apply_and_push(
         repo.git.push()
 
 
-def comment_on_issue() -> None:
-    # TODO
-    pass
+def comment_on_issue(
+    agent_comment: str | None,
+    issue_url: str,
+) -> bool:
+    comment = f"AGENT RESPONSE: {agent_comment}" or "Agent implemented the issue."
+
+    # Issue URL ends in "/ISSUE_NUM" so we want everything apart from the issue num
+    base, _ = os.path.split(issue_url)
+
+    # And then we want to append /comments
+    url = os.path.join(base, "comments")
+
+    response = requests.post(
+        url=url,
+        headers={
+            "Content-Type": "application/json",
+        },
+        json={
+            "body": comment,
+        },
+    )
+
+    return response.status_code == 200

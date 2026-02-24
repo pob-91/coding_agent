@@ -15,7 +15,7 @@ from openai import OpenAI
 
 from model.message import IssueComment, WebhookMessage
 from utils.file import find_file, generate_top_level_file_tree, read_file
-from utils.repo import check_patch, checkout_and_apply_and_push
+from utils.repo import check_patch, checkout_and_apply_and_push, comment_on_issue
 from utils.search import regex_search
 
 load_dotenv()
@@ -272,10 +272,11 @@ async def webhook_handler(
     execute = True
     while execute:
         if calls >= 50:
-            execute = False
             logger.warning(
                 "Calls exceeded 50 iterations. Perhaps let the model know or increase the limit."
             )
+            commit_message = "Agent flow exceeded 50 calls, failed to implement."
+            execute = False
             break
 
         response = client.responses.create(
@@ -289,6 +290,7 @@ async def webhook_handler(
 
         for item in response.output:
             if item.type != "function_call":
+                logger.info(f"Ingoring item in response: {item.type}")
                 continue
 
             args: dict = json.loads(item.arguments)
@@ -307,6 +309,7 @@ async def webhook_handler(
                             ),
                         }
                     )
+                    logger.warning("query not in args for search function")
                     continue
 
                 results = regex_search(
@@ -320,6 +323,9 @@ async def webhook_handler(
                         "call_id": item.call_id,
                         "output": json.dumps(results),
                     }
+                )
+                logger.info(
+                    f"Returned results of search function: {json.dumps(results)}"
                 )
                 continue
             if item.name == "list_files":
@@ -335,6 +341,7 @@ async def webhook_handler(
                             ),
                         }
                     )
+                    logger.warning("path not in args for list_files function")
                     continue
 
                 results = generate_top_level_file_tree(local_path, args["path"])
@@ -344,6 +351,9 @@ async def webhook_handler(
                         "call_id": item.call_id,
                         "output": json.dumps(results),
                     }
+                )
+                logger.info(
+                    f"Returned results of list files function: {json.dumps(results)}"
                 )
                 continue
             if item.name == "read_file":
@@ -359,6 +369,7 @@ async def webhook_handler(
                             ),
                         }
                     )
+                    logger.warning("path not in args for read file function")
                     continue
 
                 start: int = args.get("start_line", 0)
@@ -378,6 +389,7 @@ async def webhook_handler(
                             ),
                         }
                     )
+                    logger.warning("start < 0 for read file functio")
                     continue
                 if start >= end:
                     messages.append(
@@ -391,6 +403,7 @@ async def webhook_handler(
                             ),
                         }
                     )
+                    logger.warning("end not > than start for read file function")
                     continue
 
                 results = read_file(
@@ -405,6 +418,9 @@ async def webhook_handler(
                         "call_id": item.call_id,
                         "output": json.dumps(results),
                     }
+                )
+                logger.info(
+                    f"Returned results of read file function: {json.dumps(results)}"
                 )
                 continue
 
@@ -421,6 +437,7 @@ async def webhook_handler(
                             ),
                         }
                     )
+                    logger.warning("patch not in args for submit patch function")
                     continue
 
                 # If the patch does not work or is invalid then send an error message back to the model and continue executing
@@ -437,11 +454,13 @@ async def webhook_handler(
                             ),
                         }
                     )
+                    logger.warning(f"Invalid patch submitted: {e}")
                     continue
 
                 patch = args["patch"]
                 commit_message = args.get("commit_message", None)
                 execute = False
+                logger.info("Recieved valid patch, applying and ending loop.")
                 break
 
         # TODO: Maybe if the calls are getting close to 50 send a message to the model to say there are N calls left
@@ -454,6 +473,8 @@ async def webhook_handler(
     )
 
     # Add comments to the issue saying error or complete e.g. AGENT_RESPONSE:
+    if not comment_on_issue(commit_message, url):
+        logger.warning("Failed to comment on issue.")
 
     # Delete repo
     try:
