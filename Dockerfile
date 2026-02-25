@@ -1,19 +1,31 @@
 FROM ghcr.io/astral-sh/uv:python3.14-alpine AS builder
 
-COPY pyproject.toml uv.lock ./
+ENV UV_SYSTEM_PYTHON=1
+ENV UV_COMPILE_BYTECODE=1
+ENV UV_LINK_MODE=copy
+ENV PYTHONPATH=/app
 
-RUN uv export --frozen --format requirements-txt --no-dev > requirements.txt
+WORKDIR /app
 
-FROM python:3.14-alpine
+RUN --mount=type=bind,source=pyproject.toml,target=pyproject.toml \
+    --mount=type=bind,source=uv.lock,target=uv.lock \
+    --mount=type=cache,target=/root/.cache/uv \
+    uv sync --frozen --no-dev
+
+FROM python:3.14-alpine AS runner
 
 RUN apk update --no-cache && apk upgrade --no-cache
 RUN apk add --no-cache git ripgrep
 
-COPY --from=ghcr.io/astral-sh/uv:python3.14-alpine /usr/local/bin/uv /usr/local/bin/uv
-COPY --from=builder requirements.txt ./
+COPY --from=builder /app/.venv /app/.venv
 
-RUN uv pip install --system -r requirements.txt
+ENV PATH="/app/.venv/bin:$PATH"
+ENV VIRTUAL_ENV=/app/.venv
 
-COPY main.py ./
-COPY model/ ./model/
-COPY utils/ ./utils/
+COPY main.py /app
+COPY model/ /app/model/
+COPY utils/ /app/utils/
+
+WORKDIR /app
+
+ENTRYPOINT ["python", "main.py"]

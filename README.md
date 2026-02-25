@@ -6,7 +6,6 @@ If I don't enjoy this experience then I should quit tech.
 
 ### TODO
 
-- Update Dockerfile to use SYSTEM_PYTHON and BYTEDCODE e.t.c. and then copy .venv over and see
 - Tidy up a bit and isolate the tools to tools files e.t.c
 - Fix the post a comment query - the request is failing - test using cURL
 - Auto create an MR when it is complete
