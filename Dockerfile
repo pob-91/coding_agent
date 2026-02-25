@@ -1,6 +1,19 @@
-FROM python:3.14-alpine
+FROM ghcr.io/astral-sh/uv:python3.13-alpine AS builder
 
-RUN apk update --no--cache && akp upgrade --no-cache
-RUN apk add ripgre --no-cache
+COPY pyproject.toml uv.lock ./
 
-# TODO: Install using uv and system python - will need docs
+RUN uv export --frozen --format requirements-txt --no-dev > requirements.txt
+
+FROM python:3.13-alpine
+
+RUN apk update --no-cache && apk upgrade --no-cache
+RUN apk add --no-cache git ripgrep
+
+COPY --from=ghcr.io/astral-sh/uv:python3.13-alpine /usr/local/bin/uv /usr/local/bin/uv
+COPY --from=builder requirements.txt ./
+
+RUN uv pip install --system -r requirements.txt
+
+COPY main.py ./
+COPY model/ ./model/
+COPY utils/ ./utils/
