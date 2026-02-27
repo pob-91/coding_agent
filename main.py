@@ -15,7 +15,13 @@ from openai import OpenAI
 
 from model.message import IssueComment, WebhookMessage
 from utils.file import find_file, generate_top_level_file_tree, read_file
-from utils.repo import check_patch, checkout_and_apply_and_push, comment_on_issue
+from utils.repo import (
+    check_patch,
+    checkout_and_apply_and_push,
+    comment_on_issue,
+    create_pull_request,
+    prep_url,
+)
 from utils.search import regex_search
 
 load_dotenv()
@@ -112,19 +118,14 @@ async def webhook_handler(
     logger.info(f"Handling agent command: {command}")
 
     # prep the repo url
-    url = issue_comment.repository.clone_url
-    if url.startswith("http://"):
-        url = url.removeprefix("http://")
-    elif url.startswith("https://"):
-        url = url.removeprefix("https://")
-
-    url = f"https://{os.getenv('AGENT_USERNAME')}:{os.getenv('AGENT_TOKEN')}@{url}"
+    clone_url = prep_url(issue_comment.repository.clone_url)
+    repo_url = prep_url(issue_comment.repository.url)
 
     # clone the repo
     repo: Repo
     local_path = f"/tmp/{str(uuid.uuid4())}/{issue_comment.repository.name}"
     repo = Repo.clone_from(
-        url,
+        clone_url,
         local_path,
         depth=1,
     )
@@ -466,15 +467,23 @@ async def webhook_handler(
 
         # TODO: Maybe if the calls are getting close to 50 send a message to the model to say there are N calls left
 
-    checkout_and_apply_and_push(
+    issue_branch = checkout_and_apply_and_push(
         repo,
         patch,
         issue_comment.issue.title,
         commit_message,
     )
 
+    if not create_pull_request(
+        repo_url,
+        issue_comment.repository.default_branch,
+        issue_branch,
+        issue_comment.issue.title,
+    ):
+        logger.warning("Failed to create pull request for issue.")
+
     # Add comments to the issue saying error or complete e.g. AGENT_RESPONSE:
-    if not comment_on_issue(commit_message, url):
+    if not comment_on_issue(commit_message, clone_url):
         logger.warning("Failed to comment on issue.")
 
     # Delete repo

@@ -6,6 +6,15 @@ import requests
 from git import GitCommandError, Repo
 
 
+def prep_url(raw: str) -> str:
+    if raw.startswith("http://"):
+        raw = raw.removeprefix("http://")
+    elif raw.startswith("https://"):
+        raw = raw.removeprefix("https://")
+
+    return f"https://{os.getenv('AGENT_USERNAME')}:{os.getenv('AGENT_TOKEN')}@{raw}"
+
+
 def check_patch(repo: Repo, patch: str) -> Tuple[bool, str | None]:
     filename: str = ""
     try:
@@ -23,7 +32,7 @@ def checkout_and_apply_and_push(
     patch: str,
     issue_title: str,
     commit_message: str | None,
-) -> None:
+) -> str:
     # checkout branch
     prepped_title = issue_title.lower().replace(" ", "_")
     branch_name = f"issue/{prepped_title}"
@@ -60,18 +69,16 @@ def checkout_and_apply_and_push(
     else:
         repo.git.push()
 
+    return branch_name
+
 
 def comment_on_issue(
     agent_comment: str | None,
     issue_url: str,
 ) -> bool:
     comment = f"AGENT RESPONSE: {agent_comment}" or "Agent implemented the issue."
-
-    # Issue URL ends in "/ISSUE_NUM" so we want everything apart from the issue num
-    base, _ = os.path.split(issue_url)
-
     # And then we want to append /comments
-    url = os.path.join(base, "comments")
+    url = os.path.join(issue_url, "comments")
 
     response = requests.post(
         url=url,
@@ -83,7 +90,31 @@ def comment_on_issue(
         },
     )
 
-    return response.status_code == 200
+    return response.status_code == 201
+
+
+def create_pull_request(
+    repo_url: str,
+    base_branch: str,
+    issue_branch: str,
+    issue_title: str,
+) -> bool:
+    # https://git.thesanders.farm/api/v1/repos/nerd/coding_agent
+    url = os.path.join(repo_url, "pulls")
+
+    response = requests.post(
+        url=url,
+        headers={
+            "Content-Type": "application/json",
+        },
+        json={
+            "base": base_branch,
+            "head": issue_branch,  # The PR branch
+            "title": issue_title,
+        },
+    )
+
+    return response.status_code == 201
 
 
 def _write_temp_patch_file(patch: str) -> str:
