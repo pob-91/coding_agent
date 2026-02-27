@@ -5,6 +5,8 @@ from typing import Tuple
 import requests
 from git import GitCommandError, Repo
 
+from model.label import Label
+
 
 def prep_url(raw: str) -> str:
     if raw.startswith("http://"):
@@ -93,7 +95,7 @@ def comment_on_issue(
     return response.status_code == 201
 
 
-def create_pull_request(
+async def create_pull_request(
     repo_url: str,
     base_branch: str,
     issue_branch: str,
@@ -101,6 +103,9 @@ def create_pull_request(
 ) -> bool:
     # https://git.thesanders.farm/api/v1/repos/nerd/coding_agent
     url = os.path.join(repo_url, "pulls")
+
+    # Get the label to use
+    label_id = await _get_ai_agent_label(repo_url)
 
     response = requests.post(
         url=url,
@@ -111,6 +116,11 @@ def create_pull_request(
             "base": base_branch,
             "head": issue_branch,  # The PR branch
             "title": issue_title,
+            "labels": [
+                label_id,
+            ]
+            if label_id is not None
+            else [],
         },
     )
 
@@ -121,6 +131,42 @@ def _write_temp_patch_file(patch: str) -> str:
     with tempfile.NamedTemporaryFile(mode="w", delete=False, suffix=".patch") as f:
         f.write(patch)
         return f.name
+
+
+async def _get_ai_agent_label(repo_url: str) -> int | None:
+    labels_url = os.path.join(repo_url, "labels")
+
+    labels_response = requests.get(
+        url=labels_url,
+    )
+    if labels_response.status_code != 200:
+        return None
+
+    json_data: list = await labels_response.json()
+    for d in json_data:
+        label = Label.model_validate(d)
+        if label.name == "Coding Agent":
+            return label.id
+
+    # No existing label, need to create one
+    create_label_response = requests.post(
+        url=labels_url,
+        headers={
+            "Content-Type": "application/json",
+        },
+        json={
+            "color": "#507dbc",
+            "name": "Coding Agent",
+        },
+    )
+
+    if create_label_response.status_code != 201:
+        return None
+
+    label_data = await create_label_response.json()
+    label = Label.model_validate(label_data)
+
+    return label.id
 
 
 def _cleanup_temp_patch_file(path: str) -> None:

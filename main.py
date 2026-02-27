@@ -474,7 +474,7 @@ async def webhook_handler(
         commit_message,
     )
 
-    if not create_pull_request(
+    if not await create_pull_request(
         repo_url,
         issue_comment.repository.default_branch,
         issue_branch,
