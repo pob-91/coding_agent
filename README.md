@@ -7,8 +7,6 @@ If I don't enjoy this experience then I should quit tech.
 ### TODO
 
 - Tidy up a bit and isolate the tools to tools files e.t.c
-- Fix the post a comment query - the request is failing - test using cURL
-- Auto create an MR when it is complete
 - Ask the agent to implement an ask the agent flow where we can do:
   - /agent-implement {command} - one shot implement the issue
   - /agent-ask {question} - in MRs, comments left with /agent-ask respond to the comment with details
@@ -19,3 +17,11 @@ If I don't enjoy this experience then I should quit tech.
   - Talk about architecture
   - Plan new features
   - Draft and add issues for the other agent to implement
+
+
+### Future Features
+
+- Run tests function (will need a run_tests.sh file, or Makefile command)
+- Run linting function (will need a run_lint.sh file, or Makefile command)
+- Add guardrails in the form of another LLM that checks output and provides feedback before the patch is accepted
+- Add benchmarks for code complexity, performance e.t.c and ask the model to optimise for it
