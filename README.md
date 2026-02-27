@@ -7,7 +7,6 @@ If I don't enjoy this experience then I should quit tech.
 ### TODO
 
 - Tidy up a bit and isolate the tools to tools files e.t.c
-- Auto create an MR when it is complete
 - Ask the agent to implement an ask the agent flow where we can do:
   - /agent-implement {command} - one shot implement the issue
   - /agent-ask {question} - in MRs, comments left with /agent-ask respond to the comment with details
