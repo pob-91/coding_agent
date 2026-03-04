@@ -87,7 +87,7 @@ async def root():
 
 
 @app.post("/")
-async def webhook_handler(
+async def git_webhook_handler(
     request: Request,
     _: bool = Depends(verify_webhook_auth),
 ):
