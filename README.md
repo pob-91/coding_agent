@@ -6,6 +6,8 @@ If I don't enjoy this experience then I should quit tech.
 
 ### TODO
 
+- Wrap more of the functions in try catch so that agents cannot bork it up.
+- Find the best agent to generate patch files and look for other methods as some of them seem to really struggle.
 - Tidy up a bit and isolate the tools to tools files e.t.c
 - Ask the agent to implement an ask the agent flow where we can do:
   - /agent-implement {command} - one shot implement the issue

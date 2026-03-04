@@ -407,22 +407,37 @@ async def git_webhook_handler(
                     logger.warning("end not > than start for read file function")
                     continue
 
-                results = read_file(
-                    local_path,
-                    args["path"],
-                    start,
-                    end,
-                )
-                messages.append(
-                    {
-                        "type": "function_call_output",
-                        "call_id": item.call_id,
-                        "output": json.dumps(results),
-                    }
-                )
-                logger.info(
-                    f"Returned results of read file function: {json.dumps(results)}"
-                )
+                try:
+                    results = read_file(
+                        local_path,
+                        args["path"],
+                        start,
+                        end,
+                    )
+                    messages.append(
+                        {
+                            "type": "function_call_output",
+                            "call_id": item.call_id,
+                            "output": json.dumps(results),
+                        }
+                    )
+                    logger.info(
+                        f"Returned results of read file function: {json.dumps(results)}"
+                    )
+                except FileNotFoundError:
+                    messages.append(
+                        {
+                            "type": "function_call_output",
+                            "call_id": item.call_id,
+                            "output": json.dumps(
+                                {
+                                    "error": f"File not found with path {args['path']}",
+                                }
+                            ),
+                        }
+                    )
+                    logger.warning(f"File not found with path: {args['path']}")
+
                 continue
 
             if item.name == "submit_patch":
