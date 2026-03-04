@@ -281,7 +281,7 @@ async def webhook_handler(
             break
 
         response = client.responses.create(
-            model=os.getenv("AGENT_MODEL", "x-ai/grok-code-fast-1"),
+            model=os.getenv("AGENT_MODEL", "moonshotai/kimi-k2-thinking"),
             tools=tools,
             input=messages,
         )
