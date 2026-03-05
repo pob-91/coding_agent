@@ -1,8 +1,6 @@
 import json
-import logging
 import os
 import shutil
-import sys
 import uuid
 from typing import Any, Iterable
 
@@ -14,7 +12,12 @@ from git import Repo
 from openai import OpenAI
 
 from model.message import IssueComment, WebhookMessage
-from utils.file import find_file, generate_top_level_file_tree, read_file
+from tools.list_files import list_files
+from tools.read_file import read_file
+from tools.search import search
+from tools.tools import tools
+from utils.file import find_file, generate_top_level_file_tree
+from utils.logger import get_logger
 from utils.repo import (
     check_patch,
     checkout_and_apply_and_push,
@@ -22,17 +25,11 @@ from utils.repo import (
     create_pull_request,
     prep_url,
 )
-from utils.search import regex_search
 
 load_dotenv()
 
-# Initialize logger to print to stdout
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-    handlers=[logging.StreamHandler(sys.stdout)],
-)
-logger = logging.getLogger(__name__)
+
+logger = get_logger(__name__)
 
 app = FastAPI(title="Webhook API", version="1.0.0")
 
@@ -178,89 +175,6 @@ async def git_webhook_handler(
     # and then add that the user prompt.
     # For now just keeping it clean and relying on the issue body.
 
-    tools: Iterable[Any] = [
-        {
-            "type": "function",
-            "name": "search",
-            "description": "Search repository using regex.",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "query": {
-                        "type": "string",
-                        "description": "Regex pattern to use for search.",
-                    },
-                    "sub_path": {
-                        "type": "string",
-                        "description": "Optional sub-path to limit the search location relative to the repo root.",
-                    },
-                },
-                "required": ["query"],
-                "additionalProperties": False,
-            },
-        },
-        {
-            "type": "function",
-            "name": "list_files",
-            "description": "List files and directories at a given path.",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "path": {
-                        "type": "string",
-                        "description": "Directory path relative to repo root.",
-                    }
-                },
-                "required": ["path"],
-                "additionalProperties": False,
-            },
-        },
-        {
-            "type": "function",
-            "name": "read_file",
-            "description": "Read a portion of a file.",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "path": {
-                        "type": "string",
-                        "description": "File path relative to repo root.",
-                    },
-                    "start_line": {
-                        "type": "integer",
-                        "description": "Line from which to read. Cannot be < 1. Defaults to 1.",
-                    },
-                    "end_line": {
-                        "type": "integer",
-                        "description": "Line at which to stop reading. Defaults to start_line + 50.",
-                    },
-                },
-                "required": ["path"],
-                "additionalProperties": False,
-            },
-        },
-        {
-            "type": "function",
-            "name": "submit_patch",
-            "description": "Submit a code patch to resolve the issue.",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "patch": {
-                        "type": "string",
-                        "description": "A valid git patch to apply to the repo that implements the issue.",
-                    },
-                    "commit_message": {
-                        "type": "string",
-                        "description": "An optional commit message to add when committing the patch.",
-                    },
-                },
-                "required": ["patch"],
-                "additionalProperties": False,
-            },
-        },
-    ]
-
     messages: Iterable[Any] = [
         {"role": "system", "content": system_prompt},
         {"role": "user", "content": user_prompt},
@@ -298,204 +212,74 @@ async def git_webhook_handler(
             logger.info(f"Calling function: {item.name}, with args: {item.arguments}")
 
             if item.name == "search":
-                if "query" not in args:
-                    messages.append(
-                        {
-                            "type": "function_call_output",
-                            "call_id": item.call_id,
-                            "output": json.dumps(
-                                {
-                                    "error": "query argument not given to function call search"
-                                }
-                            ),
-                        }
-                    )
-                    logger.warning("query not in args for search function")
-                    continue
-
-                results = regex_search(
-                    local_path,
-                    args["query"],
-                    args.get("sub_path", None),
-                )
-                messages.append(
-                    {
-                        "type": "function_call_output",
-                        "call_id": item.call_id,
-                        "output": json.dumps(results),
-                    }
-                )
-                logger.info(
-                    f"Returned results of search function: {json.dumps(results)}"
-                )
+                message = search(args, item, local_path)
+                messages.append(message)
                 continue
             if item.name == "list_files":
-                if "path" not in args:
-                    messages.append(
-                        {
-                            "type": "function_call_output",
-                            "call_id": item.call_id,
-                            "output": json.dumps(
-                                {
-                                    "error": "path argument not given to function call search"
-                                }
-                            ),
-                        }
-                    )
-                    logger.warning("path not in args for list_files function")
-                    continue
-
-                results = generate_top_level_file_tree(local_path, args["path"])
-                messages.append(
-                    {
-                        "type": "function_call_output",
-                        "call_id": item.call_id,
-                        "output": json.dumps(results),
-                    }
-                )
-                logger.info(
-                    f"Returned results of list files function: {json.dumps(results)}"
-                )
+                message = list_files(args, item, local_path)
+                messages.append(message)
                 continue
             if item.name == "read_file":
-                if "path" not in args:
-                    messages.append(
-                        {
-                            "type": "function_call_output",
-                            "call_id": item.call_id,
-                            "output": json.dumps(
-                                {
-                                    "error": "path argument not given to function call search"
-                                }
-                            ),
-                        }
-                    )
-                    logger.warning("path not in args for read file function")
-                    continue
-
-                start: int = args.get("start_line", 1)
-                end: int = args.get("end_line", -1)
-                if end == -1:
-                    end = start + 50
-
-                if start < 1:
-                    messages.append(
-                        {
-                            "type": "function_call_output",
-                            "call_id": item.call_id,
-                            "output": json.dumps(
-                                {
-                                    "error": "start_line must be >= 1",
-                                }
-                            ),
-                        }
-                    )
-                    logger.warning("start < 0 for read file functio")
-                    continue
-                if start >= end:
-                    messages.append(
-                        {
-                            "type": "function_call_output",
-                            "call_id": item.call_id,
-                            "output": json.dumps(
-                                {
-                                    "error": "end_line must be > than start_line",
-                                }
-                            ),
-                        }
-                    )
-                    logger.warning("end not > than start for read file function")
-                    continue
-
-                try:
-                    results = read_file(
-                        local_path,
-                        args["path"],
-                        start,
-                        end,
-                    )
-                    messages.append(
-                        {
-                            "type": "function_call_output",
-                            "call_id": item.call_id,
-                            "output": json.dumps(results),
-                        }
-                    )
-                    logger.info(
-                        f"Returned results of read file function: {json.dumps(results)}"
-                    )
-                except FileNotFoundError:
-                    messages.append(
-                        {
-                            "type": "function_call_output",
-                            "call_id": item.call_id,
-                            "output": json.dumps(
-                                {
-                                    "error": f"File not found with path {args['path']}",
-                                }
-                            ),
-                        }
-                    )
-                    logger.warning(f"File not found with path: {args['path']}")
-
+                message = read_file(args, item, local_path)
+                messages.append(message)
                 continue
 
-            if item.name == "submit_patch":
-                if "patch" not in args:
-                    messages.append(
-                        {
-                            "type": "function_call_output",
-                            "call_id": item.call_id,
-                            "output": json.dumps(
-                                {
-                                    "error": "path argument not given to function call search"
-                                }
-                            ),
-                        }
-                    )
-                    logger.warning("patch not in args for submit patch function")
-                    continue
+            # if item.name == "submit_patch":
+            #     if "patch" not in args:
+            #         messages.append(
+            #             {
+            #                 "type": "function_call_output",
+            #                 "call_id": item.call_id,
+            #                 "output": json.dumps(
+            #                     {
+            #                         "error": "path argument not given to function call search"
+            #                     }
+            #                 ),
+            #             }
+            #         )
+            #         logger.warning("patch not in args for submit patch function")
+            #         continue
 
-                # If the patch does not work or is invalid then send an error message back to the model and continue executing
-                logger.info(f"Sending patch to be checked: {args['patch']}")
-                ok, e = check_patch(repo, args["patch"])
-                if not ok:
-                    messages.append(
-                        {
-                            "type": "function_call_output",
-                            "call_id": item.call_id,
-                            "output": json.dumps(
-                                {
-                                    "error": f"Invalid patch file. Error: {e}",
-                                }
-                            ),
-                        }
-                    )
-                    logger.warning(f"Invalid patch submitted: {e}")
-                    continue
+            #     # If the patch does not work or is invalid then send an error message back to the model and continue executing
+            #     logger.info(f"Sending patch to be checked: {args['patch']}")
+            #     ok, e = check_patch(repo, args["patch"])
+            #     if not ok:
+            #         messages.append(
+            #             {
+            #                 "type": "function_call_output",
+            #                 "call_id": item.call_id,
+            #                 "output": json.dumps(
+            #                     {
+            #                         "error": f"Invalid patch file. Error: {e}",
+            #                     }
+            #                 ),
+            #             }
+            #         )
+            #         logger.warning(f"Invalid patch submitted: {e}")
+            #         continue
 
-                patch = args["patch"]
-                commit_message = args.get("commit_message", None)
-                execute = False
-                logger.info("Recieved valid patch, applying and ending loop.")
-                break
+            #     patch = args["patch"]
+            #     commit_message = args.get("commit_message", None)
+            #     execute = False
+            #     logger.info("Recieved valid patch, applying and ending loop.")
+            #     break
 
         # TODO: Maybe if the calls are getting close to 50 send a message to the model to say there are N calls left
 
-    issue_branch = checkout_and_apply_and_push(
-        repo,
-        patch,
-        issue_comment.issue.title,
-        commit_message,
-    )
+    # issue_branch = checkout_and_apply_and_push(
+    #     repo,
+    #     patch,
+    #     issue_comment.issue.title,
+    #     commit_message,
+    # )
 
-    if not await create_pull_request(
-        repo_url,
-        issue_comment.repository.default_branch,
-        issue_branch,
-        issue_comment.issue.title,
-    ):
-        logger.warning("Failed to create pull request for issue.")
+    # if not await create_pull_request(
+    #     repo_url,
+    #     issue_comment.repository.default_branch,
+    #     issue_branch,
+    #     issue_comment.issue.title,
+    # ):
+    #     logger.warning("Failed to create pull request for issue.")
 
     # Add comments to the issue saying error or complete e.g. AGENT_RESPONSE:
     if not comment_on_issue(commit_message, clone_url):
