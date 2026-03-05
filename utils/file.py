@@ -1,4 +1,5 @@
 import os
+from difflib import SequenceMatcher
 from itertools import islice
 
 
@@ -44,3 +45,46 @@ def read_file(
     with open(path, "r") as f:
         lines = islice(f, start_line - 1, end_line)
         return "".join(lines)
+
+
+def replace_text(
+    root: str,
+    sub_path: str,
+    search: str,
+    text: str,
+    fuzzy_threshold: float = 0.8,
+) -> bool:
+    path = os.path.join(root, sub_path)
+
+    if not os.path.exists(path):
+        raise FileNotFoundError()
+
+    with open(path, "r") as f:
+        content = f.read()
+
+    if search in content:
+        content = content.replace(search, text)
+        with open(path, "w") as f:
+            f.write(content)
+        return True
+
+    search_len = len(search)
+    best_ratio = 0.0
+    best_start = -1
+
+    for i in range(len(content) - search_len + 1):
+        candidate = content[i : i + search_len]
+        ratio = SequenceMatcher(None, search, candidate).ratio()
+        if ratio > best_ratio:
+            best_ratio = ratio
+            best_start = i
+
+    if best_ratio < fuzzy_threshold:
+        return False
+
+    content = content[:best_start] + text + content[best_start + search_len :]
+
+    with open(path, "w") as f:
+        f.write(content)
+
+    return True

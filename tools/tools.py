@@ -63,21 +63,25 @@ tools: Iterable[Any] = [
     },
     {
         "type": "function",
-        "name": "submit_patch",
-        "description": "Submit a code patch to resolve the issue.",
+        "name": "replace_text",
+        "description": "Replace a piece of text in a given file.",
         "parameters": {
             "type": "object",
             "properties": {
-                "patch": {
+                "path": {
                     "type": "string",
-                    "description": "A valid git patch to apply to the repo that implements the issue.",
+                    "description": "The path of the file to modify.",
                 },
-                "commit_message": {
+                "search": {
                     "type": "string",
-                    "description": "An optional commit message to add when committing the patch.",
+                    "description": "The block of text to replace in the file.",
+                },
+                "replacement": {
+                    "type": "string",
+                    "description": "The replacement block of text to add.",
                 },
             },
-            "required": ["patch"],
+            "required": ["path", "search", "replacement"],
             "additionalProperties": False,
         },
     },

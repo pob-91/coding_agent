@@ -2,6 +2,7 @@ import json
 import os
 import shutil
 import uuid
+from ast import Continue
 from typing import Any, Iterable
 
 import uvicorn
@@ -14,6 +15,7 @@ from openai import OpenAI
 from model.message import IssueComment, WebhookMessage
 from tools.list_files import list_files
 from tools.read_file import read_file
+from tools.replace_text import replace_text
 from tools.search import search
 from tools.tools import tools
 from utils.file import find_file, generate_top_level_file_tree
@@ -181,7 +183,6 @@ async def git_webhook_handler(
     ]
     logger.info(f"Sending initial message to agent: {json.dumps(messages)}")
 
-    patch: str = ""
     commit_message: str | None = None
     calls = 0
     execute = True
@@ -221,6 +222,10 @@ async def git_webhook_handler(
                 continue
             if item.name == "read_file":
                 message = read_file(args, item, local_path)
+                messages.append(message)
+                continue
+            if item.name == "replace_text":
+                message = replace_text(args, item, local_path)
                 messages.append(message)
                 continue
 
