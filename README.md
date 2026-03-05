@@ -6,12 +6,6 @@ If I don't enjoy this experience then I should quit tech.
 
 ### TODO
 
-- If there is a 500 or the LLM fails do we clean up??
-- Replace the submit patch function with: replace_text(file, search, replace), insert_after(file, search, text) and delete_text(file, search)
-  - You will need to update the repo.py functions as we will be modifying the files locally, so you will want to checkout the issue branch before running the LLM
-  - You will need to update the system prompt
-  - You will need a complete function
-
 - Ask the agent to implement an ask the agent flow where we can do:
   - /agent-implement {command} - one shot implement the issue
   - /agent-ask {question} - in MRs, comments left with /agent-ask respond to the comment with details

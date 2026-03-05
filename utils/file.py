@@ -88,3 +88,90 @@ def replace_text(
         f.write(content)
 
     return True
+
+
+def insert_after(
+    root: str,
+    sub_path: str,
+    search: str,
+    text: str,
+    fuzzy_threshold: float = 0.8,
+) -> bool:
+    path = os.path.join(root, sub_path)
+
+    if not os.path.exists(path):
+        raise FileNotFoundError()
+
+    with open(path, "r") as f:
+        content = f.read()
+
+    if search in content:
+        idx = content.index(search) + len(search)
+        content = content[:idx] + text + content[idx:]
+        with open(path, "w") as f:
+            f.write(content)
+        return True
+
+    search_len = len(search)
+    best_ratio = 0.0
+    best_start = -1
+
+    for i in range(len(content) - search_len + 1):
+        candidate = content[i : i + search_len]
+        ratio = SequenceMatcher(None, search, candidate).ratio()
+        if ratio > best_ratio:
+            best_ratio = ratio
+            best_start = i
+
+    if best_ratio < fuzzy_threshold:
+        return False
+
+    insert_pos = best_start + search_len
+    content = content[:insert_pos] + text + content[insert_pos:]
+
+    with open(path, "w") as f:
+        f.write(content)
+
+    return True
+
+
+def delete_text(
+    root: str,
+    sub_path: str,
+    search: str,
+    fuzzy_threshold: float = 0.8,
+) -> bool:
+    path = os.path.join(root, sub_path)
+
+    if not os.path.exists(path):
+        raise FileNotFoundError()
+
+    with open(path, "r") as f:
+        content = f.read()
+
+    if search in content:
+        content = content.replace(search, "", 1)
+        with open(path, "w") as f:
+            f.write(content)
+        return True
+
+    search_len = len(search)
+    best_ratio = 0.0
+    best_start = -1
+
+    for i in range(len(content) - search_len + 1):
+        candidate = content[i : i + search_len]
+        ratio = SequenceMatcher(None, search, candidate).ratio()
+        if ratio > best_ratio:
+            best_ratio = ratio
+            best_start = i
+
+    if best_ratio < fuzzy_threshold:
+        return False
+
+    content = content[:best_start] + content[best_start + search_len :]
+
+    with open(path, "w") as f:
+        f.write(content)
+
+    return True

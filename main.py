@@ -2,7 +2,6 @@ import json
 import os
 import shutil
 import uuid
-from ast import Continue
 from typing import Any, Iterable
 
 import uvicorn
@@ -13,6 +12,8 @@ from git import Repo
 from openai import OpenAI
 
 from model.message import IssueComment, WebhookMessage
+from tools.delete_text import delete_text
+from tools.insert_after import insert_after
 from tools.list_files import list_files
 from tools.read_file import read_file
 from tools.replace_text import replace_text
@@ -21,9 +22,9 @@ from tools.tools import tools
 from utils.file import find_file, generate_top_level_file_tree
 from utils.logger import get_logger
 from utils.repo import (
-    check_patch,
-    checkout_and_apply_and_push,
+    checkout_issue_branch,
     comment_on_issue,
+    commit_changes_and_push,
     create_pull_request,
     prep_url,
 )
@@ -177,6 +178,9 @@ async def git_webhook_handler(
     # and then add that the user prompt.
     # For now just keeping it clean and relying on the issue body.
 
+    # Before starting the agent loop we checkout the issue branch
+    issue_branch, first_push = checkout_issue_branch(repo, issue_comment.issue.title)
+
     messages: Iterable[Any] = [
         {"role": "system", "content": system_prompt},
         {"role": "user", "content": user_prompt},
@@ -185,14 +189,17 @@ async def git_webhook_handler(
 
     commit_message: str | None = None
     calls = 0
+    max_calls = 100
     execute = True
+    success = True
     while execute:
-        if calls >= 50:
+        if calls >= max_calls:
             logger.warning(
-                "Calls exceeded 50 iterations. Perhaps let the model know or increase the limit."
+                "Calls exceeded 100 iterations. Perhaps let the model know or increase the limit."
             )
-            commit_message = "Agent flow exceeded 50 calls, failed to implement."
+            commit_message = "Agent flow exceeded 100 iterations, failed to implement."
             execute = False
+            success = False
             break
 
         response = client.responses.create(
@@ -201,6 +208,21 @@ async def git_webhook_handler(
             input=messages,
         )
         calls += 1
+
+        if calls % 10 == 0:
+            messages.append(
+                {
+                    "role": "user",
+                    "content": f"You have now used {calls} of a maximum {max_calls} tool calls.",
+                }
+            )
+        if max_calls - calls < 10:
+            messages.append(
+                {
+                    "role": "user",
+                    "content": f"You have now used {calls} of a maximum {max_calls} tool calls. Probably time to wrap up.",
+                }
+            )
 
         messages.extend(response.output)
 
@@ -228,67 +250,43 @@ async def git_webhook_handler(
                 message = replace_text(args, item, local_path)
                 messages.append(message)
                 continue
+            if item.name == "insert_after":
+                message = insert_after(args, item, local_path)
+                messages.append(message)
+                continue
+            if item.name == "delete_text":
+                message = delete_text(args, item, local_path)
+                messages.append(message)
+                continue
+            if item.name == "commit":
+                # We are complete
+                execute = False
+                if "commit_message" in args:
+                    commit_message = args["commit_message"]
 
-            # if item.name == "submit_patch":
-            #     if "patch" not in args:
-            #         messages.append(
-            #             {
-            #                 "type": "function_call_output",
-            #                 "call_id": item.call_id,
-            #                 "output": json.dumps(
-            #                     {
-            #                         "error": "path argument not given to function call search"
-            #                     }
-            #                 ),
-            #             }
-            #         )
-            #         logger.warning("patch not in args for submit patch function")
-            #         continue
+                logger.info("Recieved commit call, finalising changes.")
 
-            #     # If the patch does not work or is invalid then send an error message back to the model and continue executing
-            #     logger.info(f"Sending patch to be checked: {args['patch']}")
-            #     ok, e = check_patch(repo, args["patch"])
-            #     if not ok:
-            #         messages.append(
-            #             {
-            #                 "type": "function_call_output",
-            #                 "call_id": item.call_id,
-            #                 "output": json.dumps(
-            #                     {
-            #                         "error": f"Invalid patch file. Error: {e}",
-            #                     }
-            #                 ),
-            #             }
-            #         )
-            #         logger.warning(f"Invalid patch submitted: {e}")
-            #         continue
+    if success:
+        # Now we commit the changes and push them to the remote branch
+        commit_changes_and_push(
+            repo,
+            issue_branch,
+            first_push,
+            commit_message,
+        )
 
-            #     patch = args["patch"]
-            #     commit_message = args.get("commit_message", None)
-            #     execute = False
-            #     logger.info("Recieved valid patch, applying and ending loop.")
-            #     break
+        # Then we create a pull request
+        if not await create_pull_request(
+            repo_url,
+            issue_comment.repository.default_branch,
+            issue_branch,
+            issue_comment.issue.title,
+        ):
+            logger.warning("Failed to create pull request for issue.")
 
-        # TODO: Maybe if the calls are getting close to 50 send a message to the model to say there are N calls left
-
-    # issue_branch = checkout_and_apply_and_push(
-    #     repo,
-    #     patch,
-    #     issue_comment.issue.title,
-    #     commit_message,
-    # )
-
-    # if not await create_pull_request(
-    #     repo_url,
-    #     issue_comment.repository.default_branch,
-    #     issue_branch,
-    #     issue_comment.issue.title,
-    # ):
-    #     logger.warning("Failed to create pull request for issue.")
-
-    # Add comments to the issue saying error or complete e.g. AGENT_RESPONSE:
-    if not comment_on_issue(commit_message, clone_url):
-        logger.warning("Failed to comment on issue.")
+        # Add comments to the issue saying error or complete e.g. AGENT_RESPONSE:
+        if not comment_on_issue(commit_message, clone_url):
+            logger.warning("Failed to comment on issue.")
 
     # Delete repo
     try:

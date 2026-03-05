@@ -1,9 +1,8 @@
 import os
-import tempfile
 from typing import Tuple
 
 import requests
-from git import GitCommandError, Repo
+from git import Repo
 
 from model.label import Label
 
@@ -17,24 +16,7 @@ def prep_url(raw: str) -> str:
     return f"https://{os.getenv('AGENT_USERNAME')}:{os.getenv('AGENT_TOKEN')}@{raw}"
 
 
-def check_patch(repo: Repo, patch: str) -> Tuple[bool, str | None]:
-    filename: str = ""
-    try:
-        filename = _write_temp_patch_file(patch)
-        repo.git.apply("--check", filename)
-        return True, None
-    except GitCommandError as e:
-        return False, str(e)
-    finally:
-        _cleanup_temp_patch_file(filename)
-
-
-def checkout_and_apply_and_push(
-    repo: Repo,
-    patch: str,
-    issue_title: str,
-    commit_message: str | None,
-) -> str:
+def checkout_issue_branch(repo: Repo, issue_title: str) -> Tuple[str, bool]:
     # checkout branch
     prepped_title = issue_title.lower().replace(" ", "_")
     branch_name = f"issue/{prepped_title}"
@@ -54,14 +36,17 @@ def checkout_and_apply_and_push(
     else:
         first_push = True
         repo.git.checkout("-b", branch_name)
-        repo.git.push("-u", "origin", branch_name)
 
-    # apply patch
-    filename = _write_temp_patch_file(patch)
-    repo.git.apply(filename)
-    _cleanup_temp_patch_file(filename)
+    return branch_name, first_push
 
-    # stage and commit
+
+def commit_changes_and_push(
+    repo: Repo,
+    branch_name: str,
+    first_push: bool,
+    commit_message: str | None,
+) -> None:
+    # commit changes
     repo.git.add(A=True)
     repo.index.commit(commit_message or "Agent applied commit.")
 
@@ -70,8 +55,6 @@ def checkout_and_apply_and_push(
         repo.git.push("-u", "origin", branch_name)
     else:
         repo.git.push()
-
-    return branch_name
 
 
 def comment_on_issue(
@@ -127,12 +110,6 @@ async def create_pull_request(
     return response.status_code == 201
 
 
-def _write_temp_patch_file(patch: str) -> str:
-    with tempfile.NamedTemporaryFile(mode="w", delete=False, suffix=".patch") as f:
-        f.write(patch)
-        return f.name
-
-
 async def _get_ai_agent_label(repo_url: str) -> int | None:
     labels_url = os.path.join(repo_url, "labels")
 
@@ -167,7 +144,3 @@ async def _get_ai_agent_label(repo_url: str) -> int | None:
     label = Label.model_validate(label_data)
 
     return label.id
-
-
-def _cleanup_temp_patch_file(path: str) -> None:
-    os.unlink(path)

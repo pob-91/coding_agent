@@ -24,10 +24,10 @@ Agent Command:
 Your task:
 
 - Understand the issue.
-- Determine what files must change.
+- Determine which files must change.
 - Use tools to retrieve only necessary context.
 - Modify only what is required to resolve the issue.
-- Produce a minimal unified diff patch.
+- Commit your changes when complete.
 
 Constraints:
 
@@ -39,4 +39,4 @@ Constraints:
 - If tests exist and the issue implies a behavior change, update or add tests accordingly.
 - If insufficient context is available, call tools to retrieve it.
 
-When confident the issue is resolved, return ONLY a valid unified diff patch.
+When all changes are complete, call the commit tool with a brief commit message.
