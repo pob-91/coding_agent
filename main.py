@@ -109,11 +109,11 @@ async def git_webhook_handler(
     issue_comment = IssueComment.model_validate(json_data)
 
     comment = issue_comment.comment.body.strip()
-    if not comment.startswith("/agent"):
+    if not comment.startswith("/agent-implement"):
         logger.info("Issue comment not targeted at agents.")
         return
 
-    command = comment.removeprefix("/agent")
+    command = comment.removeprefix("/agent-implement")
 
     logger.info(f"Handling agent command: {command}")
 
@@ -170,7 +170,7 @@ async def git_webhook_handler(
     user_prompt = user_prompt.replace("{{issue_body}}", issue_comment.issue.body)
 
     agent_command = issue_comment.comment.body.strip()
-    agent_command = agent_command.removeprefix("/agent")
+    agent_command = agent_command.removeprefix("/agent-implement")
     agent_command = agent_command.strip()
     user_prompt = user_prompt.replace("{{agent_command}}", agent_command)
 

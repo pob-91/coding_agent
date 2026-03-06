@@ -4,6 +4,22 @@ I need to lean into LLM agents coding for me or leave the industry.
 
 If I don't enjoy this experience then I should quit tech.
 
+### Commands
+
+#### /agent-implement
+
+The `/agent-implement` command triggers the coding agent to implement an issue. To use it, leave a comment on an issue with the following format:
+
+```
+/agent-implement please implement the above issue
+```
+
+The agent will:
+- Checkout the issue repository
+- Read information about the repository and the issue
+- Gather context using tools about the files in the repository
+- Generate a code patch that can be applied to the repository that addresses the issue
+
 ### TODO
 
 - TEST TOOL!
