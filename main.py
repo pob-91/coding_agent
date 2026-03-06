@@ -11,7 +11,8 @@ from fastapi.responses import JSONResponse
 from git import Repo
 from openai import OpenAI
 
-from model.message import IssueComment, WebhookMessage
+from model.issue_comment import IssueComment
+from model.webhook_message import WebhookMessage
 from tools.delete_text import delete_text
 from tools.insert_after import insert_after
 from tools.list_files import list_files
