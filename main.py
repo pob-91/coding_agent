@@ -77,7 +77,6 @@ async def git_webhook_handler(
 
     message = WebhookMessage.model_validate(json_data)
 
-    # TODO: Extend this to handle pull request comments to update existing MRs
     if message.action != "created":
         logger.warning(f"Recieved action that is not handled {message.action}")
         return
