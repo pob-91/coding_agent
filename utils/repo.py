@@ -119,7 +119,7 @@ async def _get_ai_agent_label(repo_url: str) -> int | None:
     if labels_response.status_code != 200:
         return None
 
-    json_data: list = await labels_response.json()
+    json_data: list = labels_response.json()
     for d in json_data:
         label = Label.model_validate(d)
         if label.name == "Coding Agent":
@@ -140,7 +140,7 @@ async def _get_ai_agent_label(repo_url: str) -> int | None:
     if create_label_response.status_code != 201:
         return None
 
-    label_data = await create_label_response.json()
+    label_data = create_label_response.json()
     label = Label.model_validate(label_data)
 
     return label.id

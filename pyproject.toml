@@ -5,11 +5,11 @@ description = "Agent that takes tasks from an webhook and raises MRs."
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
-    "fastapi>=0.129.0",
+    "fastapi>=0.135.0",
     "gitpython>=3.1.46",
-    "openai>=2.21.0",
+    "openai>=2.26.0",
     "pydantic>=2.12.5",
-    "python-dotenv>=1.2.1",
+    "python-dotenv>=1.2.2",
     "requests>=2.32.5",
     "ripgrepy>=2.2.0",
     "uvicorn>=0.40.0",
