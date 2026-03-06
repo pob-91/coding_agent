@@ -24,7 +24,6 @@ The agent will:
 
 - TEST TOOL!
 - Ask the agent to implement an ask the agent flow where we can do:
-  - /agent-implement {command} - one shot implement the issue
   - /agent-ask {question} - in MRs, comments left with /agent-ask respond to the comment with details
   - /agent-update {command} - in MRs, comments left with /agent-update trigger a new flow that updates the existing MR
 
