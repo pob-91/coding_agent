@@ -5,6 +5,7 @@ import requests
 from git import Repo
 
 from model.label import Label
+from model.pull_review_comment import PullReviewComment
 
 
 def prep_url(raw: str) -> str:
@@ -76,6 +77,21 @@ def comment_on_issue(
     )
 
     return response.status_code == 201
+
+
+def get_review_comments(
+    repo_url: str,
+    pr_number: int,
+    review_id: int,
+) -> list[PullReviewComment]:
+    url = os.path.join(repo_url, "pulls", str(pr_number), "reviews", str(review_id), "comments")
+
+    response = requests.get(url=url)
+
+    if response.status_code != 200:
+        return []
+
+    return [PullReviewComment.model_validate(c) for c in response.json()]
 
 
 async def create_pull_request(
