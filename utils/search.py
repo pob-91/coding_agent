@@ -35,9 +35,11 @@ def regex_search(
         if i >= result_limit:
             break
 
+        full_path = r["data"]["path"]["text"]
+        relative_path = os.path.relpath(full_path, repo_root)
         results.append(
             {
-                "path": r["data"]["path"]["text"],
+                "path": relative_path,
                 "line": r["data"]["line_number"],
                 "snippet": r["data"]["lines"]["text"],
             }
