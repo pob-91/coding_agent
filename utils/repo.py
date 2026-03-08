@@ -61,7 +61,7 @@ def comment_on_issue(
     agent_comment: str | None,
     issue_url: str,
 ) -> bool:
-    comment = f"AGENT RESPONSE: {agent_comment}" or "Agent implemented the issue."
+    comment = f"AGENT RESPONSE: {agent_comment}" if agent_comment else "Agent implemented the issue."
     # And then we want to append /comments
     url = os.path.join(issue_url, "comments")
 

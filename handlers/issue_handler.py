@@ -200,7 +200,8 @@ class IssueCommentHandler(BaseHandler):
             ):
                 logger.warning("Failed to create pull request for issue.")
 
-            if not comment_on_issue(commit_message, clone_url):
+            issue_url = f"{repo_url}/issues/{issue_comment.issue.number}"
+            if not comment_on_issue(commit_message, issue_url):
                 logger.warning("Failed to comment on issue.")
 
         try:
