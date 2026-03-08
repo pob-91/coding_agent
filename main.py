@@ -6,8 +6,7 @@ from fastapi import Depends, FastAPI, Header, HTTPException, Request
 from fastapi.responses import JSONResponse
 
 from handlers.issue_handler import IssueCommentHandler
-from model.issue_comment import IssueComment
-from model.webhook_message import WebhookMessage
+from model.webhook_message import WebhookMessage, WebhookMessageType
 from utils.logger import get_logger
 
 load_dotenv()
@@ -77,14 +76,17 @@ async def git_webhook_handler(
 
     message = WebhookMessage.model_validate(json_data)
 
-    if message.action != "created":
+    message_type, typed_message = message.infer_type()
+
+    if message_type == WebhookMessageType.NONE:
         logger.warning(f"Recieved action that is not handled {message.action}")
-        return
+        return JSONResponse(status_code=200, content={"status": "ok"})
 
-    issue_comment = IssueComment.model_validate(json_data)
+    if message_type == WebhookMessageType.ISSUE_COMMENT:
+        await IssueCommentHandler().handle(typed_message)
+        return JSONResponse(status_code=200, content={"status": "ok"})
 
-    await IssueCommentHandler().handle(issue_comment)
-
+    logger.warning(f"No handler for message type {message_type}")
     return JSONResponse(status_code=200, content={"status": "ok"})
 
 
