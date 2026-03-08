@@ -111,6 +111,26 @@ tools: Iterable[Any] = [
     },
     {
         "type": "function",
+        "name": "create_file",
+        "description": "Create a new file at the given path. Optionally provide initial text content.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "path": {
+                    "type": "string",
+                    "description": "File path relative to repo root.",
+                },
+                "text": {
+                    "type": "string",
+                    "description": "Optional initial text content for the file.",
+                },
+            },
+            "required": ["path"],
+            "additionalProperties": False,
+        },
+    },
+    {
+        "type": "function",
         "name": "delete_text",
         "description": "Deletes a block of text in a given file.",
         "parameters": {

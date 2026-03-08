@@ -3,9 +3,6 @@ from typing import Tuple
 
 from pydantic import BaseModel, ConfigDict
 
-from model.issue_comment import IssueComment
-from model.pr_comment import PRComment
-
 
 class WebhookMessageType(StrEnum):
     NONE = ""
@@ -22,7 +19,11 @@ class WebhookMessage(BaseModel):
     def infer_type(self) -> Tuple[WebhookMessageType, "WebhookMessage | None"]:
         data = self.model_dump()
         if self.action == "created" and not self.is_pull and "pull_request" not in data:
+            from model.issue_comment import IssueComment
+
             return WebhookMessageType.ISSUE_COMMENT, IssueComment.model_validate(data)
         if self.action == "created" and self.is_pull and "pull_request" in data:
+            from model.pr_comment import PRComment
+
             return WebhookMessageType.PR_COMMENT, PRComment.model_validate(data)
         return WebhookMessageType.NONE, None

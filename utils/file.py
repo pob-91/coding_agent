@@ -135,6 +135,22 @@ def insert_after(
     return True
 
 
+def create_file(
+    root: str,
+    sub_path: str,
+    text: str = "",
+) -> None:
+    path = os.path.join(root, sub_path)
+
+    if os.path.exists(path):
+        raise FileExistsError()
+
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+
+    with open(path, "w") as f:
+        f.write(text)
+
+
 def delete_text(
     root: str,
     sub_path: str,

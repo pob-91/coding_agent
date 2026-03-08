@@ -10,6 +10,7 @@ from openai import OpenAI
 from handlers.base_handler import BaseHandler
 from model.issue_comment import IssueComment
 from model.webhook_message import WebhookMessage
+from tools.create_file import create_file
 from tools.delete_text import delete_text
 from tools.insert_after import insert_after
 from tools.list_files import list_files
@@ -156,6 +157,9 @@ class IssueCommentHandler(BaseHandler):
                 args: dict = json.loads(item.arguments)
                 logger.info(f"Calling function: {item.name}, with args: {item.arguments}")
 
+                if item.name == "create_file":
+                    messages.append(create_file(args, item, local_path))
+                    continue
                 if item.name == "search":
                     messages.append(search(args, item, local_path))
                     continue
