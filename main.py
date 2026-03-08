@@ -6,6 +6,8 @@ from fastapi import Depends, FastAPI, Header, HTTPException, Request
 from fastapi.responses import JSONResponse
 
 from handlers.issue_handler import IssueCommentHandler
+from handlers.pr_comment_handler import PRCommentHandler
+from handlers.pr_review_handler import PRReviewHandler
 from model.webhook_message import WebhookMessage, WebhookMessageType
 from utils.logger import get_logger
 
@@ -84,6 +86,14 @@ async def git_webhook_handler(
 
     if message_type == WebhookMessageType.ISSUE_COMMENT:
         await IssueCommentHandler().handle(typed_message)
+        return JSONResponse(status_code=200, content={"status": "ok"})
+
+    if message_type == WebhookMessageType.PR_COMMENT:
+        await PRCommentHandler().handle(typed_message)
+        return JSONResponse(status_code=200, content={"status": "ok"})
+
+    if message_type == WebhookMessageType.PR_REVIEW:
+        await PRReviewHandler().handle(typed_message)
         return JSONResponse(status_code=200, content={"status": "ok"})
 
     logger.warning(f"No handler for message type {message_type}")

@@ -8,6 +8,7 @@ class WebhookMessageType(StrEnum):
     NONE = ""
     ISSUE_COMMENT = "issue_comment"
     PR_COMMENT = "pr_comment"
+    PR_REVIEW = "pr_review"
 
 
 class WebhookMessage(BaseModel):
@@ -26,4 +27,8 @@ class WebhookMessage(BaseModel):
             from model.pr_comment import PRComment
 
             return WebhookMessageType.PR_COMMENT, PRComment.model_validate(data)
+        if self.action == "reviewed" and "pull_request" in data:
+            from model.pr_review import PRReview
+
+            return WebhookMessageType.PR_REVIEW, PRReview.model_validate(data)
         return WebhookMessageType.NONE, None
