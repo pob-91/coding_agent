@@ -5,6 +5,7 @@ import requests
 from git import Repo
 
 from model.label import Label
+from model.pull_review import PullReview
 from model.pull_review_comment import PullReviewComment
 
 
@@ -62,7 +63,11 @@ def comment_on_issue(
     agent_comment: str | None,
     issue_url: str,
 ) -> bool:
-    comment = f"AGENT RESPONSE: {agent_comment}" if agent_comment else "Agent implemented the issue."
+    comment = (
+        f"AGENT RESPONSE: {agent_comment}"
+        if agent_comment
+        else "Agent implemented the issue."
+    )
     # And then we want to append /comments
     url = os.path.join(issue_url, "comments")
 
@@ -96,14 +101,24 @@ def reply_to_comment(
     return response.status_code == 201
 
 
-def get_review_comments(
+def get_most_recent_review_comments(
     repo_url: str,
     pr_number: int,
-    review_id: int,
 ) -> list[PullReviewComment]:
-    url = os.path.join(repo_url, "pulls", str(pr_number), "reviews", str(review_id), "comments")
+    reviews_url = os.path.join(repo_url, "pulls", str(pr_number), "reviews")
+    reviews_response = requests.get(url=reviews_url)
+    if reviews_response.status_code != 200:
+        return []
 
-    response = requests.get(url=url)
+    reviews = [PullReview.model_validate(r) for r in reviews_response.json()]
+    reviews = [r for r in reviews if r.comments_count > 0]
+    reviews = sorted(reviews, key=lambda x: x.updated_at, reverse=True)
+
+    recent_comments_url = os.path.join(
+        repo_url, "pulls", str(pr_number), "reviews", str(reviews[0].id), "comments"
+    )
+
+    response = requests.get(url=recent_comments_url)
 
     if response.status_code != 200:
         return []

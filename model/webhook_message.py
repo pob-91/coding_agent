@@ -15,7 +15,7 @@ class WebhookMessage(BaseModel):
     model_config = ConfigDict(extra="allow")
 
     action: str
-    is_pull: bool
+    is_pull: bool | None = None
 
     def infer_type(self) -> Tuple[WebhookMessageType, "WebhookMessage | None"]:
         data = self.model_dump()

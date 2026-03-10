@@ -3,7 +3,7 @@ from handlers.base_handler import BaseHandler
 from model.pr_review import PRReview
 from model.webhook_message import WebhookMessage
 from utils.logger import get_logger
-from utils.repo import get_review_comments, prep_url
+from utils.repo import get_most_recent_review_comments, prep_url
 
 logger = get_logger(__name__)
 
@@ -15,10 +15,9 @@ class PRReviewHandler(BaseHandler):
         review_event: PRReview = data  # type: ignore[assignment]
 
         repo_url = prep_url(review_event.repository.url)
-        all_comments = get_review_comments(
+        all_comments = get_most_recent_review_comments(
             repo_url,
             review_event.pull_request.number,
-            review_event.review.id,
         )
 
         triggering_comments = [
