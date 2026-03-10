@@ -22,7 +22,10 @@ The agent will:
 
 ### TODO
 
-- Does agent ask flow repond function respond to the correct message? Not just add a comment in general?
+- The agent ask flow seems to not be checking out the correct branch as reading files that are only available on that branch seems to fail, check the branch is checked out and check the path that is actually being read is the /tmp path not ./.
+- Responding back to the question is failing, the AI probably hallucinated the API endpoint.
+
+
 - Move the system prompt and user prompt to a flow called /agent-implement in the flows folder
 - Update the other flows to not use _COMMAND but _ASK_COMMAND and then test the flow
 
