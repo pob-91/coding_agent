@@ -25,8 +25,9 @@ ENV VIRTUAL_ENV=/app/.venv
 COPY main.py /app
 COPY model/ /app/model/
 COPY utils/ /app/utils/
-COPY system_prompt.txt /app
-COPY user_prompt_template.txt /app
+COPY prompts/agent_ask_system_prompt.txt /app
+COPY prompts/issue_comment_system_prompt.txt /app
+COPY prompts/issue_comment_user_prompt_template.txt /app
 
 WORKDIR /app
 

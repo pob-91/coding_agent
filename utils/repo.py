@@ -79,6 +79,23 @@ def comment_on_issue(
     return response.status_code == 201
 
 
+def reply_to_comment(
+    agent_comment: str,
+    repo_url: str,
+    comment_id: int,
+) -> bool:
+    comment = f"AGENT RESPONSE: {agent_comment}"
+    url = os.path.join(repo_url, "issues", "comments", str(comment_id), "replies")
+
+    response = requests.post(
+        url=url,
+        headers={"Content-Type": "application/json"},
+        json={"body": comment},
+    )
+
+    return response.status_code == 201
+
+
 def get_review_comments(
     repo_url: str,
     pr_number: int,

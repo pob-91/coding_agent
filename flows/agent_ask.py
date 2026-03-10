@@ -2,7 +2,6 @@ import json
 import os
 import shutil
 import uuid
-from pathlib import Path
 from typing import Any, Iterable
 
 from git import Repo
@@ -12,72 +11,14 @@ from model.pull_review_comment import PullReviewComment
 from model.repository import Repository
 from tools.list_files import list_files
 from tools.read_file import read_file
+from tools.respond import respond
 from tools.search import search
+from tools.tools import ask_tools
 from utils.file import find_file, generate_top_level_file_tree
 from utils.logger import get_logger
-from utils.repo import comment_on_issue, prep_url
+from utils.repo import prep_url
 
 logger = get_logger(__name__)
-
-_SYSTEM_PROMPT_PATH = Path(__file__).parent / "agent_ask_system_prompt.txt"
-
-_ask_tools: Iterable[Any] = [
-    {
-        "type": "function",
-        "name": "search",
-        "description": "Search repository using regex.",
-        "parameters": {
-            "type": "object",
-            "properties": {
-                "query": {"type": "string", "description": "Regex pattern to search."},
-                "sub_path": {"type": "string", "description": "Optional sub-path relative to repo root."},
-            },
-            "required": ["query"],
-            "additionalProperties": False,
-        },
-    },
-    {
-        "type": "function",
-        "name": "list_files",
-        "description": "List files and directories at a given path.",
-        "parameters": {
-            "type": "object",
-            "properties": {
-                "path": {"type": "string", "description": "Directory path relative to repo root."},
-            },
-            "required": ["path"],
-            "additionalProperties": False,
-        },
-    },
-    {
-        "type": "function",
-        "name": "read_file",
-        "description": "Read a portion of a file.",
-        "parameters": {
-            "type": "object",
-            "properties": {
-                "path": {"type": "string", "description": "File path relative to repo root."},
-                "start_line": {"type": "integer", "description": "Line to start reading from. Defaults to 1."},
-                "end_line": {"type": "integer", "description": "Line to stop reading. Defaults to start_line + 50."},
-            },
-            "required": ["path"],
-            "additionalProperties": False,
-        },
-    },
-    {
-        "type": "function",
-        "name": "respond",
-        "description": "Submit your final answer. Call this once you have sufficient context to answer the question.",
-        "parameters": {
-            "type": "object",
-            "properties": {
-                "answer": {"type": "string", "description": "The answer to post as a comment on the pull request."},
-            },
-            "required": ["answer"],
-            "additionalProperties": False,
-        },
-    },
-]
 
 
 def _build_user_prompt(
@@ -98,9 +39,7 @@ def _build_user_prompt(
     if code_contexts:
         context_blocks = []
         for c in code_contexts:
-            context_blocks.append(
-                f"File: {c.path}\n```diff\n{c.diff_hunk}\n```"
-            )
+            context_blocks.append(f"File: {c.path}\n```diff\n{c.diff_hunk}\n```")
         parts.append("\nCode context from review:\n" + "\n\n".join(context_blocks))
 
     parts.append(f"\nQuestion: {question}")
@@ -111,7 +50,8 @@ def _build_user_prompt(
 async def run_agent_ask(
     question: str,
     repository: Repository,
-    pr_number: int,
+    comment_id: int,
+    branch: str,
     code_contexts: list[PullReviewComment] | None = None,
 ) -> None:
     client = OpenAI(
@@ -126,12 +66,13 @@ async def run_agent_ask(
     repo = Repo.clone_from(clone_url, local_path, depth=1)
 
     try:
-        repo.git.checkout("main")
+        repo.git.checkout(branch)
     except Exception:
         pass
 
     try:
-        system_prompt = _SYSTEM_PROMPT_PATH.read_text()
+        with open("./agent_ask_system_prompt.txt", "r") as f:
+            system_prompt = f.read()
 
         agents_md: str | None = None
         agents_path = find_file(local_path, "AGENTS.md")
@@ -160,12 +101,17 @@ async def run_agent_ask(
 
         while True:
             if calls >= max_calls:
-                logger.warning("agent-ask exceeded max iterations without a respond call.")
+                logger.warning(
+                    "agent-ask exceeded max iterations without a respond call."
+                )
                 break
 
             response = client.responses.create(
-                model=os.getenv("AGENT_MODEL", "moonshotai/kimi-k2-thinking"),
-                tools=_ask_tools,
+                model=os.getenv(
+                    "AGENT_MODEL",
+                    "moonshotai/kimi-k2-thinking",
+                ),
+                tools=ask_tools,
                 input=messages,
             )
             calls += 1
@@ -182,13 +128,13 @@ async def run_agent_ask(
                 logger.info(f"agent-ask calling: {item.name}, args: {item.arguments}")
 
                 if item.name == "respond":
-                    answer = args.get("answer", "")
-                    issue_url = f"{repo_url}/issues/{pr_number}"
-                    if not comment_on_issue(answer, issue_url):
-                        logger.warning("agent-ask failed to post answer as comment.")
-                    answered = True
+                    respond(
+                        args,
+                        item,
+                        comment_id,
+                        repo_url,
+                    )
                     break
-
                 if item.name == "search":
                     messages.append(search(args, item, local_path))
                 elif item.name == "list_files":

@@ -17,7 +17,7 @@ from tools.list_files import list_files
 from tools.read_file import read_file
 from tools.replace_text import replace_text
 from tools.search import search
-from tools.tools import tools
+from tools.tools import issue_tools
 from utils.file import find_file, generate_top_level_file_tree
 from utils.logger import get_logger
 from utils.repo import (
@@ -65,13 +65,15 @@ class IssueCommentHandler(BaseHandler):
         except Exception:
             pass  # Already on main branch
 
-        with open("./system_prompt.txt", "r") as f:
+        with open("./issue_comment_system_prompt.txt", "r") as f:
             system_prompt = f.read()
 
-        with open("./user_prompt_template.txt", "r") as f:
+        with open("./issue_comment_user_prompt_template.txt", "r") as f:
             user_prompt = f.read()
 
-        user_prompt = user_prompt.replace("{{repo_name}}", issue_comment.repository.name)
+        user_prompt = user_prompt.replace(
+            "{{repo_name}}", issue_comment.repository.name
+        )
 
         file_tree = generate_top_level_file_tree(local_path)
         user_prompt = user_prompt.replace("{{file_tree}}", file_tree)
@@ -102,7 +104,9 @@ class IssueCommentHandler(BaseHandler):
         # and then add that the user prompt.
         # For now just keeping it clean and relying on the issue body.
 
-        issue_branch, first_push = checkout_issue_branch(repo, issue_comment.issue.title)
+        issue_branch, first_push = checkout_issue_branch(
+            repo, issue_comment.issue.title
+        )
 
         messages: Iterable[Any] = [
             {"role": "system", "content": system_prompt},
@@ -120,14 +124,16 @@ class IssueCommentHandler(BaseHandler):
                 logger.warning(
                     "Calls exceeded 100 iterations. Perhaps let the model know or increase the limit."
                 )
-                commit_message = "Agent flow exceeded 100 iterations, failed to implement."
+                commit_message = (
+                    "Agent flow exceeded 100 iterations, failed to implement."
+                )
                 execute = False
                 success = False
                 break
 
             response = self.client.responses.create(
                 model=os.getenv("AGENT_MODEL", "moonshotai/kimi-k2-thinking"),
-                tools=tools,
+                tools=issue_tools,
                 input=messages,
             )
             calls += 1
@@ -155,7 +161,9 @@ class IssueCommentHandler(BaseHandler):
                     continue
 
                 args: dict = json.loads(item.arguments)
-                logger.info(f"Calling function: {item.name}, with args: {item.arguments}")
+                logger.info(
+                    f"Calling function: {item.name}, with args: {item.arguments}"
+                )
 
                 if item.name == "create_file":
                     messages.append(create_file(args, item, local_path))

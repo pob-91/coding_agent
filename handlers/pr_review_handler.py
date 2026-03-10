@@ -14,26 +14,31 @@ class PRReviewHandler(BaseHandler):
     async def handle(self, data: WebhookMessage) -> None:
         review_event: PRReview = data  # type: ignore[assignment]
 
-        content = review_event.review.content.strip()
-        if not content.startswith(_COMMAND):
-            logger.info("PR review not targeted at agents.")
-            return
-
-        question = content.removeprefix(_COMMAND).strip()
-        if not question:
-            logger.warning("agent-ask received empty question in PR review.")
-            return
-
         repo_url = prep_url(review_event.repository.url)
-        code_contexts = get_review_comments(
+        all_comments = get_review_comments(
             repo_url,
             review_event.pull_request.number,
             review_event.review.id,
         )
 
-        await run_agent_ask(
-            question=question,
-            repository=review_event.repository,
-            pr_number=review_event.pull_request.number,
-            code_contexts=code_contexts,
-        )
+        triggering_comments = [
+            c for c in all_comments if c.body.strip().startswith(_COMMAND)
+        ]
+
+        if len(triggering_comments) == 0:
+            logger.info("PR review not targeted at agents.")
+            return
+
+        for triggering_comment in triggering_comments:
+            question = triggering_comment.body.strip().removeprefix(_COMMAND).strip()
+            if not question:
+                logger.warning("agent-ask received empty question in PR review.")
+                continue
+
+            await run_agent_ask(
+                question=question,
+                repository=review_event.repository,
+                comment_id=triggering_comment.id,
+                branch=review_event.pull_request.head.ref,
+                code_contexts=[triggering_comment],
+            )

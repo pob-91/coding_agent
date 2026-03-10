@@ -26,5 +26,6 @@ class PRCommentHandler(BaseHandler):
         await run_agent_ask(
             question=question,
             repository=pr_comment.repository,
-            pr_number=pr_comment.pull_request.number,
+            comment_id=pr_comment.comment.id,
+            branch=pr_comment.pull_request.head.ref,
         )
