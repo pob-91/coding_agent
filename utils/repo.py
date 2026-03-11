@@ -31,10 +31,9 @@ def checkout_issue_branch(repo: Repo, issue_title: str) -> Tuple[str, bool]:
     if repo.is_dirty(untracked_files=True):
         raise RuntimeError("Working tree is dirty")
 
-    # The checkout depth is 1 so we add the issue branch to the origin so we can see if it already exists
-    repo.git.remote("set-branches", "--add", "origin", branch_name)
-
-    origin.fetch()
+    # The checkout depth is 1 so we need to update the origin to track all branches
+    repo.git.remote("set-branches", "origin", "*")
+    repo.git.fetch("origin", "--depth=1")
 
     first_push = False
     remote_refs = [ref.remote_head for ref in origin.refs]
