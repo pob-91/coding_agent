@@ -2,10 +2,8 @@ import asyncio
 import json
 import os
 import shutil
-import uuid
 from typing import Any, Iterable
 
-from git import Repo
 from openai import OpenAI
 
 from model.pull_review_comment import PullReviewComment
@@ -17,7 +15,7 @@ from tools.search import search
 from tools.tools import ask_tools
 from utils.file import find_file, generate_top_level_file_tree
 from utils.logger import get_logger
-from utils.repo import prep_url
+from utils.repo import clone_and_checkout, prep_url
 
 logger = get_logger(__name__)
 
@@ -64,31 +62,24 @@ async def run_agent_ask(
     clone_url = prep_url(repository.clone_url)
     repo_url = prep_url(repository.url)
 
-    local_path = f"/tmp/{uuid.uuid4()}/{repository.name}"
-    repo = Repo.clone_from(clone_url, local_path, depth=1)
-
-    logger.info(f"Checking out branch for agent ask {branch}")
-
-    try:
-        repo.git.remote("set-branches", "--add", "origin", branch)
-        repo.git.fetch("origin", branch, "--depth=1")
-        repo.git.checkout(branch)
-    except Exception as e:
-        logger.warning(f"Failed to check out branch {branch} with exception: {e}")
-        raise
+    repo_data = clone_and_checkout(
+        repo_name=repository.name,
+        clone_url=clone_url,
+        branch_name=branch,
+    )
 
     try:
         with open("./agent_ask_system_prompt.txt", "r") as f:
             system_prompt = f.read()
 
         agents_md: str | None = None
-        agents_path = find_file(local_path, "AGENTS.md")
+        agents_path = find_file(repo_data.local_path, "AGENTS.md")
         if agents_path:
             agents_path_str = agents_path
             with open(agents_path_str, "r") as f:
                 agents_md = f.read()
 
-        file_tree = generate_top_level_file_tree(local_path)
+        file_tree = generate_top_level_file_tree(repo_data.local_path)
 
         user_prompt = _build_user_prompt(
             repo_name=repository.name,
@@ -145,11 +136,11 @@ async def run_agent_ask(
                     )
                     answered = True
                 elif item.name == "search":
-                    messages.append(search(args, item, local_path))
+                    messages.append(search(args, item, repo_data.local_path))
                 elif item.name == "list_files":
-                    messages.append(list_files(args, item, local_path))
+                    messages.append(list_files(args, item, repo_data.local_path))
                 elif item.name == "read_file":
-                    messages.append(read_file(args, item, local_path))
+                    messages.append(read_file(args, item, repo_data.local_path))
                 else:
                     logger.warning(f"agent-ask received unknown tool call: {item.name}")
 
@@ -158,6 +149,6 @@ async def run_agent_ask(
 
     finally:
         try:
-            shutil.rmtree(local_path)
+            shutil.rmtree(repo_data.local_path)
         except OSError as e:
             logger.warning(f"agent-ask failed to clean up repo: {e.strerror}")

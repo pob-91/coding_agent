@@ -2,13 +2,13 @@ import asyncio
 import json
 import os
 import shutil
-import uuid
-from typing import Any, Iterable
+from dataclasses import dataclass
+from typing import Any, Iterable, Literal
 
-from git import Repo
 from openai import OpenAI
 
 from model.issue import Issue
+from model.pull_review_comment import PullReviewComment
 from model.repository import Repository
 from tools.create_file import create_file
 from tools.delete_text import delete_text
@@ -18,23 +18,85 @@ from tools.read_file import read_file
 from tools.replace_text import replace_text
 from tools.search import search
 from tools.tools import issue_tools
-from utils.file import find_file, generate_top_level_file_tree
 from utils.logger import get_logger
+from utils.prompt import build_implement_user_prompt
 from utils.repo import (
-    checkout_issue_branch,
+    CheckoutResponse,
+    clone_and_checkout,
     comment_on_issue,
     commit_changes_and_push,
     create_pull_request,
+    post_on_pr,
+    prep_issue_branch_name,
     prep_url,
 )
 
 logger = get_logger(__name__)
 
 
+@dataclass
+class PRSource:
+    pr_number: int
+    branch: str
+    source_comment_url: str | None
+    code_contexts: list[PullReviewComment] | None
+
+
+@dataclass
+class ImplementationSource:
+    source: Literal["issue", "pr"]
+    issue: Issue | None
+    pr: PRSource | None
+
+
+def _branch_name(source: ImplementationSource) -> str:
+    if source.pr is not None:
+        return source.pr.branch
+
+    if source.issue is not None:
+        return prep_issue_branch_name(issue_title=source.issue.title)
+
+    raise Exception("AHHHHH!")
+
+
+async def _wrap_up(
+    source: ImplementationSource,
+    repo_url: str,
+    repository: Repository,
+    repo_data: CheckoutResponse,
+    commit_message: str | None,
+) -> None:
+    if source.issue is not None:
+        if not await create_pull_request(
+            repo_url=repo_url,
+            base_branch=repository.default_branch,
+            issue_branch=repo_data.branch_name,
+            issue_title=source.issue.title,
+        ):
+            logger.warning("Failed to create pull request for issue.")
+
+        issue_url = f"{repo_url}/issues/{source.issue.number}"
+        if not comment_on_issue(commit_message, issue_url):
+            logger.warning("Failed to comment on issue.")
+        return
+
+    if source.pr is not None:
+        if not post_on_pr(
+            agent_comment=f"Implemeted agent-update flow: {commit_message}",
+            repo_url=repo_url,
+            pr_number=source.pr.pr_number,
+            source_comment_url=source.pr.source_comment_url,
+        ):
+            logger.warning("Failed to comment on PR.")
+        return
+
+    raise Exception("Pooooo!")
+
+
 async def run_agent_implement(
     agent_command: str,
     repository: Repository,
-    issue: Issue,
+    source: ImplementationSource,
 ) -> None:
     client = OpenAI(
         base_url="https://openrouter.ai/api/v1",
@@ -44,48 +106,23 @@ async def run_agent_implement(
     clone_url = prep_url(repository.clone_url)
     repo_url = prep_url(repository.url)
 
-    local_path = f"/tmp/{str(uuid.uuid4())}/{repository.name}"
-    repo = Repo.clone_from(
-        clone_url,
-        local_path,
-        depth=1,
+    branch_name = _branch_name(source)
+    repo_data = clone_and_checkout(
+        repo_name=repository.name,
+        clone_url=clone_url,
+        branch_name=branch_name,
     )
 
-    try:
-        repo.git.checkout("main")
-    except Exception:
-        pass  # Already on main branch
-
-    with open("./issue_comment_system_prompt.txt", "r") as f:
+    with open("./agent_implement_system_prompt.txt", "r") as f:
         system_prompt = f.read()
 
-    with open("./issue_comment_user_prompt_template.txt", "r") as f:
-        user_prompt = f.read()
-
-    user_prompt = user_prompt.replace("{{repo_name}}", repository.name)
-
-    file_tree = generate_top_level_file_tree(local_path)
-    user_prompt = user_prompt.replace("{{file_tree}}", file_tree)
-
-    agents_path = find_file(local_path, "AGENTS.md")
-    if agents_path is not None:
-        logger.info("Found AGENTS.md, adding to user prompt.")
-        with open(agents_path, "r") as f:
-            agents_content = f.read()
-            user_prompt = user_prompt.replace(
-                "{{agents_md_content}}",
-                f"START AGENTS_MD --{agents_content}-- END AGENTS_MD",
-            )
-    else:
-        user_prompt = user_prompt.replace("{{agents_md_content}}", "No AGENTS.md provided.")
-
-    user_prompt = user_prompt.replace("{{issue_title}}", issue.title)
-    user_prompt = user_prompt.replace("{{issue_body}}", issue.body)
-
-    agent_command = agent_command.strip()
-    user_prompt = user_prompt.replace("{{agent_command}}", agent_command)
-
-    issue_branch, first_push = checkout_issue_branch(repo, issue.title)
+    user_prompt = build_implement_user_prompt(
+        repository=repository,
+        local_path=repo_data.local_path,
+        issue=source.issue,
+        agent_command=agent_command,
+        code_contexts=source.pr.code_contexts if source.pr is not None else None,
+    )
 
     messages: Iterable[Any] = [
         {"role": "system", "content": system_prompt},
@@ -101,9 +138,7 @@ async def run_agent_implement(
 
     while execute:
         if calls >= max_calls:
-            logger.warning(
-                "Calls exceeded 100 iterations. Perhaps let the model know or increase the limit."
-            )
+            logger.warning("Calls exceeded 100 iterations. Perhaps increase the limit.")
             commit_message = "Agent flow exceeded 100 iterations, failed to implement."
             execute = False
             success = False
@@ -143,25 +178,25 @@ async def run_agent_implement(
             logger.info(f"Calling function: {item.name}, with args: {item.arguments}")
 
             if item.name == "create_file":
-                messages.append(create_file(args, item, local_path))
+                messages.append(create_file(args, item, repo_data.local_path))
                 continue
             if item.name == "search":
-                messages.append(search(args, item, local_path))
+                messages.append(search(args, item, repo_data.local_path))
                 continue
             if item.name == "list_files":
-                messages.append(list_files(args, item, local_path))
+                messages.append(list_files(args, item, repo_data.local_path))
                 continue
             if item.name == "read_file":
-                messages.append(read_file(args, item, local_path))
+                messages.append(read_file(args, item, repo_data.local_path))
                 continue
             if item.name == "replace_text":
-                messages.append(replace_text(args, item, local_path))
+                messages.append(replace_text(args, item, repo_data.local_path))
                 continue
             if item.name == "insert_after":
-                messages.append(insert_after(args, item, local_path))
+                messages.append(insert_after(args, item, repo_data.local_path))
                 continue
             if item.name == "delete_text":
-                messages.append(delete_text(args, item, local_path))
+                messages.append(delete_text(args, item, repo_data.local_path))
                 continue
             if item.name == "commit":
                 execute = False
@@ -171,25 +206,21 @@ async def run_agent_implement(
 
     if success:
         commit_changes_and_push(
-            repo,
-            issue_branch,
-            first_push,
-            commit_message,
+            repo=repo_data.repo,
+            branch_name=branch_name,
+            first_push=repo_data.first_push,
+            commit_message=commit_message,
         )
 
-        if not await create_pull_request(
-            repo_url,
-            repository.default_branch,
-            issue_branch,
-            issue.title,
-        ):
-            logger.warning("Failed to create pull request for issue.")
-
-        issue_url = f"{repo_url}/issues/{issue.number}"
-        if not comment_on_issue(commit_message, issue_url):
-            logger.warning("Failed to comment on issue.")
+        await _wrap_up(
+            source=source,
+            repo_url=repo_url,
+            repository=repository,
+            repo_data=repo_data,
+            commit_message=commit_message,
+        )
 
     try:
-        shutil.rmtree(local_path)
+        shutil.rmtree(repo_data.local_path)
     except OSError as e:
         logger.warning(f"Failed to clean up and delete repo on disk: {e.strerror}")

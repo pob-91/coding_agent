@@ -1,4 +1,4 @@
-from flows.agent_implement import run_agent_implement
+from flows.agent_implement import ImplementationSource, run_agent_implement
 from handlers.base_handler import BaseHandler
 from model.issue_comment import IssueComment
 from model.webhook_message import WebhookMessage
@@ -28,5 +28,9 @@ class IssueCommentHandler(BaseHandler):
         await run_agent_implement(
             agent_command=agent_command,
             repository=issue_comment.repository,
-            issue=issue_comment.issue,
+            source=ImplementationSource(
+                source="issue",
+                issue=issue_comment.issue,
+                pr=None,
+            ),
         )
