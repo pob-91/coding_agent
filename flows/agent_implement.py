@@ -52,44 +52,46 @@ def _build_user_prompt(
     ]
 
     if agents_md:
-        parts.append(f"START AGENTS_MD --{agents_md}-- END AGENTS_MD")
+        parts.append(f"Repository Guidelines (AGENTS.md):\n{agents_md}")
     else:
         parts.append("No AGENTS.md provided.")
 
-    parts.extend([
-        "",
-        "If AGENTS.md is present, you MUST follow its rules.",
-        "If there is a conflict between the issue request and AGENTS.md, follow AGENTS.md.",
-        "",
-        "Issue Title:",
-        issue_title,
-        "",
-        "Issue Description:",
-        issue_body,
-        "",
-        "Agent Command:",
-        agent_command,
-        "",
-        "Your task:",
-        "",
-        "- Understand the issue.",
-        "- Determine which files must change.",
-        "- Use tools to retrieve only necessary context.",
-        "- Modify only what is required to resolve the issue.",
-        "- Commit your changes when complete.",
-        "",
-        "Constraints:",
-        "",
-        "- Do not modify unrelated files.",
-        "- Do not rewrite entire files unless absolutely necessary.",
-        "- Preserve formatting and style conventions.",
-        "- Avoid introducing new dependencies unless required.",
-        "- Do not change public APIs unless explicitly required.",
-        "- If tests exist and the issue implies a behavior change, update or add tests accordingly.",
-        "- If insufficient context is available, call tools to retrieve it.",
-        "",
-        "When all changes are complete, call the commit tool with a brief commit message.",
-    ])
+    parts.extend(
+        [
+            "",
+            "If AGENTS.md is present, you MUST follow its rules.",
+            "If there is a conflict between the issue request and AGENTS.md, follow AGENTS.md.",
+            "",
+            "Issue Title:",
+            issue_title,
+            "",
+            "Issue Description:",
+            issue_body,
+            "",
+            "Agent Command:",
+            agent_command,
+            "",
+            "Your task:",
+            "",
+            "- Understand the issue.",
+            "- Determine which files must change.",
+            "- Use tools to retrieve only necessary context.",
+            "- Modify only what is required to resolve the issue.",
+            "- Commit your changes when complete.",
+            "",
+            "Constraints:",
+            "",
+            "- Do not modify unrelated files.",
+            "- Do not rewrite entire files unless absolutely necessary.",
+            "- Preserve formatting and style conventions.",
+            "- Avoid introducing new dependencies unless required.",
+            "- Do not change public APIs unless explicitly required.",
+            "- If tests exist and the issue implies a behavior change, update or add tests accordingly.",
+            "- If insufficient context is available, call tools to retrieve it.",
+            "",
+            "When all changes are complete, call the commit tool with a brief commit message.",
+        ]
+    )
 
     return "\n".join(parts)
 
