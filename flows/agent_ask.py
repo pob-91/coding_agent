@@ -51,9 +51,10 @@ def _build_user_prompt(
 async def run_agent_ask(
     question: str,
     repository: Repository,
-    comment_id: int,
+    pr_number: int,
     branch: str,
     code_contexts: list[PullReviewComment] | None = None,
+    source_comment_url: str | None = None,
 ) -> None:
     client = OpenAI(
         base_url="https://openrouter.ai/api/v1",
@@ -138,11 +139,12 @@ async def run_agent_ask(
                     respond(
                         args,
                         item,
-                        comment_id,
                         repo_url,
+                        pr_number,
+                        source_comment_url=source_comment_url,
                     )
-                    break
-                if item.name == "search":
+                    answered = True
+                elif item.name == "search":
                     messages.append(search(args, item, local_path))
                 elif item.name == "list_files":
                     messages.append(list_files(args, item, local_path))

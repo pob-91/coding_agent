@@ -6,3 +6,4 @@ class Comment(BaseModel):
 
     id: int
     body: str
+    html_url: str

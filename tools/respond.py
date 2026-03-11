@@ -2,7 +2,7 @@ import json
 from typing import Any
 
 from utils.logger import get_logger
-from utils.repo import reply_to_comment
+from utils.repo import post_on_pr
 
 logger = get_logger(__name__)
 
@@ -10,8 +10,9 @@ logger = get_logger(__name__)
 def respond(
     args: dict,
     item: Any,
-    comment_id: int,
     repo_url: str,
+    pr_number: int,
+    source_comment_url: str | None = None,
 ) -> dict:
     missing_args: list[str] = []
     if "answer" not in args:
@@ -29,7 +30,12 @@ def respond(
             ),
         }
 
-    posted = reply_to_comment(args["answer"], repo_url, comment_id)
+    posted = post_on_pr(
+        args["answer"],
+        repo_url,
+        pr_number,
+        source_comment_url,
+    )
     if not posted:
         logger.warning("agent-ask failed to post answer as comment.")
         return {

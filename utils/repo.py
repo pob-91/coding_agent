@@ -7,6 +7,9 @@ from git import Repo
 from model.label import Label
 from model.pull_review import PullReview
 from model.pull_review_comment import PullReviewComment
+from utils.logger import get_logger
+
+logger = get_logger(__name__)
 
 
 def prep_url(raw: str) -> str:
@@ -27,6 +30,9 @@ def checkout_issue_branch(repo: Repo, issue_title: str) -> Tuple[str, bool]:
 
     if repo.is_dirty(untracked_files=True):
         raise RuntimeError("Working tree is dirty")
+
+    # The checkout depth is 1 so we add the issue branch to the origin so we can see if it already exists
+    repo.git.remote("set-branches", "--add", "origin", branch_name)
 
     origin.fetch()
 
@@ -84,19 +90,27 @@ def comment_on_issue(
     return response.status_code == 201
 
 
-def reply_to_comment(
+def post_on_pr(
     agent_comment: str,
     repo_url: str,
-    comment_id: int,
+    pr_number: int,
+    source_comment_url: str | None = None,
 ) -> bool:
-    comment = f"AGENT RESPONSE: {agent_comment}"
-    url = os.path.join(repo_url, "issues", "comments", str(comment_id), "replies")
+    if source_comment_url is None:
+        comment = f"AGENT RESPONSE:\n\n {agent_comment}"
+    else:
+        comment = f"AGENT RESPONSE [source comment]({source_comment_url}):\n\n {agent_comment}"
+
+    url = os.path.join(repo_url, "issues", str(pr_number), "comments")
 
     response = requests.post(
         url=url,
         headers={"Content-Type": "application/json"},
         json={"body": comment},
     )
+
+    if response.status_code != 201:
+        logger.error(f"Failed to comment on PR with code {response.status_code}")
 
     return response.status_code == 201
 
@@ -108,6 +122,9 @@ def get_most_recent_review_comments(
     reviews_url = os.path.join(repo_url, "pulls", str(pr_number), "reviews")
     reviews_response = requests.get(url=reviews_url)
     if reviews_response.status_code != 200:
+        logger.error(
+            f"Failed to get reviews on pull request: {reviews_response.status_code}"
+        )
         return []
 
     reviews = [PullReview.model_validate(r) for r in reviews_response.json()]
@@ -121,6 +138,7 @@ def get_most_recent_review_comments(
     response = requests.get(url=recent_comments_url)
 
     if response.status_code != 200:
+        logger.error(f"Failed to get comments on review: {response.status_code}")
         return []
 
     return [PullReviewComment.model_validate(c) for c in response.json()]

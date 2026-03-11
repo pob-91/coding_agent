@@ -37,7 +37,8 @@ class PRReviewHandler(BaseHandler):
             await run_agent_ask(
                 question=question,
                 repository=review_event.repository,
-                comment_id=triggering_comment.id,
+                pr_number=review_event.pull_request.number,
                 branch=review_event.pull_request.head.ref,
                 code_contexts=[triggering_comment],
+                source_comment_url=triggering_comment.html_url,
             )

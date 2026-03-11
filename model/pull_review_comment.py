@@ -7,4 +7,5 @@ class PullReviewComment(BaseModel):
     id: int
     body: str
     path: str
+    html_url: str
     diff_hunk: str
