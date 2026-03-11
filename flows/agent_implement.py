@@ -31,6 +31,69 @@ from utils.repo import (
 logger = get_logger(__name__)
 
 
+def _build_user_prompt(
+    repo_name: str,
+    file_tree: str,
+    agents_md: str | None,
+    issue_title: str,
+    issue_body: str,
+    agent_command: str,
+) -> str:
+    parts = [
+        "You are working on the following repository:",
+        "",
+        "Repository Name:",
+        repo_name,
+        "",
+        "Repository Structure (top-level overview):",
+        file_tree,
+        "",
+        "Repository Guidelines (AGENTS.md):",
+    ]
+
+    if agents_md:
+        parts.append(f"START AGENTS_MD --{agents_md}-- END AGENTS_MD")
+    else:
+        parts.append("No AGENTS.md provided.")
+
+    parts.extend([
+        "",
+        "If AGENTS.md is present, you MUST follow its rules.",
+        "If there is a conflict between the issue request and AGENTS.md, follow AGENTS.md.",
+        "",
+        "Issue Title:",
+        issue_title,
+        "",
+        "Issue Description:",
+        issue_body,
+        "",
+        "Agent Command:",
+        agent_command,
+        "",
+        "Your task:",
+        "",
+        "- Understand the issue.",
+        "- Determine which files must change.",
+        "- Use tools to retrieve only necessary context.",
+        "- Modify only what is required to resolve the issue.",
+        "- Commit your changes when complete.",
+        "",
+        "Constraints:",
+        "",
+        "- Do not modify unrelated files.",
+        "- Do not rewrite entire files unless absolutely necessary.",
+        "- Preserve formatting and style conventions.",
+        "- Avoid introducing new dependencies unless required.",
+        "- Do not change public APIs unless explicitly required.",
+        "- If tests exist and the issue implies a behavior change, update or add tests accordingly.",
+        "- If insufficient context is available, call tools to retrieve it.",
+        "",
+        "When all changes are complete, call the commit tool with a brief commit message.",
+    ])
+
+    return "\n".join(parts)
+
+
 async def run_agent_implement(
     agent_command: str,
     repository: Repository,
@@ -59,31 +122,23 @@ async def run_agent_implement(
     with open("./issue_comment_system_prompt.txt", "r") as f:
         system_prompt = f.read()
 
-    with open("./issue_comment_user_prompt_template.txt", "r") as f:
-        user_prompt = f.read()
-
-    user_prompt = user_prompt.replace("{{repo_name}}", repository.name)
-
     file_tree = generate_top_level_file_tree(local_path)
-    user_prompt = user_prompt.replace("{{file_tree}}", file_tree)
 
+    agents_content: str | None = None
     agents_path = find_file(local_path, "AGENTS.md")
     if agents_path is not None:
         logger.info("Found AGENTS.md, adding to user prompt.")
         with open(agents_path, "r") as f:
             agents_content = f.read()
-            user_prompt = user_prompt.replace(
-                "{{agents_md_content}}",
-                f"START AGENTS_MD --{agents_content}-- END AGENTS_MD",
-            )
-    else:
-        user_prompt = user_prompt.replace("{{agents_md_content}}", "No AGENTS.md provided.")
 
-    user_prompt = user_prompt.replace("{{issue_title}}", issue.title)
-    user_prompt = user_prompt.replace("{{issue_body}}", issue.body)
-
-    agent_command = agent_command.strip()
-    user_prompt = user_prompt.replace("{{agent_command}}", agent_command)
+    user_prompt = _build_user_prompt(
+        repo_name=repository.name,
+        file_tree=file_tree,
+        agents_md=agents_content,
+        issue_title=issue.title,
+        issue_body=issue.body,
+        agent_command=agent_command.strip(),
+    )
 
     issue_branch, first_push = checkout_issue_branch(repo, issue.title)
 
