@@ -1,3 +1,4 @@
+import asyncio
 import json
 import os
 import shutil
@@ -131,7 +132,8 @@ class IssueCommentHandler(BaseHandler):
                 success = False
                 break
 
-            response = self.client.responses.create(
+            response = await asyncio.to_thread(
+                self.client.responses.create,
                 model=os.getenv("AGENT_MODEL", "moonshotai/kimi-k2-thinking"),
                 tools=issue_tools,
                 input=messages,

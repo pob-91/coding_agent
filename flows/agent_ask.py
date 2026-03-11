@@ -1,3 +1,4 @@
+import asyncio
 import json
 import os
 import shutil
@@ -65,10 +66,15 @@ async def run_agent_ask(
     local_path = f"/tmp/{uuid.uuid4()}/{repository.name}"
     repo = Repo.clone_from(clone_url, local_path, depth=1)
 
+    logger.info(f"Checking out branch for agent ask {branch}")
+
     try:
+        repo.git.remote("set-branches", "--add", "origin", branch)
+        repo.git.fetch("origin", branch, "--depth=1")
         repo.git.checkout(branch)
-    except Exception:
-        pass
+    except Exception as e:
+        logger.warning(f"Failed to check out branch {branch} with exception: {e}")
+        raise
 
     try:
         with open("./agent_ask_system_prompt.txt", "r") as f:
@@ -106,7 +112,8 @@ async def run_agent_ask(
                 )
                 break
 
-            response = client.responses.create(
+            response = await asyncio.to_thread(
+                client.responses.create,
                 model=os.getenv(
                     "AGENT_MODEL",
                     "moonshotai/kimi-k2-thinking",
