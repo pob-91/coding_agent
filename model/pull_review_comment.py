@@ -7,9 +7,5 @@ class PullReviewComment(BaseModel):
     id: int
     body: str
     path: str
+    html_url: str
     diff_hunk: str
-    position: int
-    original_position: int
-    commit_id: str
-    original_commit_id: str
-    pull_request_review_id: int

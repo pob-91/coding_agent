@@ -1,6 +1,6 @@
 from typing import Any, Iterable
 
-tools: Iterable[Any] = [
+issue_tools: Iterable[Any] = [
     {
         "type": "function",
         "name": "search",
@@ -162,6 +162,82 @@ tools: Iterable[Any] = [
                 },
             },
             "required": [],
+            "additionalProperties": False,
+        },
+    },
+]
+
+ask_tools: Iterable[Any] = [
+    {
+        "type": "function",
+        "name": "search",
+        "description": "Search repository using regex.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "query": {"type": "string", "description": "Regex pattern to search."},
+                "sub_path": {
+                    "type": "string",
+                    "description": "Optional sub-path relative to repo root.",
+                },
+            },
+            "required": ["query"],
+            "additionalProperties": False,
+        },
+    },
+    {
+        "type": "function",
+        "name": "list_files",
+        "description": "List files and directories at a given path.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "path": {
+                    "type": "string",
+                    "description": "Directory path relative to repo root.",
+                },
+            },
+            "required": ["path"],
+            "additionalProperties": False,
+        },
+    },
+    {
+        "type": "function",
+        "name": "read_file",
+        "description": "Read a portion of a file.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "path": {
+                    "type": "string",
+                    "description": "File path relative to repo root.",
+                },
+                "start_line": {
+                    "type": "integer",
+                    "description": "Line to start reading from. Defaults to 1.",
+                },
+                "end_line": {
+                    "type": "integer",
+                    "description": "Line to stop reading. Defaults to start_line + 50.",
+                },
+            },
+            "required": ["path"],
+            "additionalProperties": False,
+        },
+    },
+    {
+        "type": "function",
+        "name": "respond",
+        "description": "Submit your final answer. Call this once you have sufficient context to answer the question.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "answer": {
+                    "type": "string",
+                    "description": "The answer to post as a comment on the pull request.",
+                },
+            },
+            "required": ["answer"],
             "additionalProperties": False,
         },
     },

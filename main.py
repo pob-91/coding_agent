@@ -81,7 +81,7 @@ async def git_webhook_handler(
     message_type, typed_message = message.infer_type()
 
     if message_type == WebhookMessageType.NONE or typed_message is None:
-        logger.warning(f"Recieved action that is not handled {message.action}")
+        logger.info(f"Recieved action that is not handled {message.action}")
         return JSONResponse(status_code=200, content={"status": "ok"})
 
     if message_type == WebhookMessageType.ISSUE_COMMENT:

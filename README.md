@@ -22,9 +22,10 @@ The agent will:
 
 ### TODO
 
-- TEST TOOL!
+- Move the system prompt and user prompt to a flow called /agent-implement in the flows folder
+- Update the other flows to not use _COMMAND but _ASK_COMMAND and then test the flow
+
 - Ask the agent to implement an ask the agent flow where we can do:
-  - /agent-ask {question} - in MRs, comments left with /agent-ask respond to the comment with details
   - /agent-update {command} - in MRs, comments left with /agent-update trigger a new flow that updates the existing MR
 
 - Finally do an /agent-discuss flow where a chat in an app like Slack is passed to it along with the tools and project context. This agent can:
