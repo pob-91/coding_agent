@@ -1,4 +1,6 @@
 import os
+import uuid
+from dataclasses import dataclass
 from typing import Tuple
 
 import requests
@@ -21,10 +23,26 @@ def prep_url(raw: str) -> str:
     return f"https://{os.getenv('AGENT_USERNAME')}:{os.getenv('AGENT_TOKEN')}@{raw}"
 
 
-def checkout_issue_branch(repo: Repo, issue_title: str) -> Tuple[str, bool]:
-    # checkout branch
+def prep_issue_branch_name(issue_title: str) -> str:
     prepped_title = issue_title.lower().replace(" ", "_")
-    branch_name = f"issue/{prepped_title}"
+    return f"issue/{prepped_title}"
+
+
+@dataclass
+class CheckoutResponse:
+    repo: Repo
+    branch_name: str
+    first_push: bool
+    local_path: str
+
+
+def clone_and_checkout(
+    repo_name: str,
+    clone_url: str,
+    branch_name: str,
+) -> CheckoutResponse:
+    local_path = f"/tmp/{uuid.uuid4()}/{repo_name}"
+    repo = Repo.clone_from(clone_url, local_path, depth=1)
 
     origin = repo.remotes.origin
 
@@ -44,7 +62,12 @@ def checkout_issue_branch(repo: Repo, issue_title: str) -> Tuple[str, bool]:
         first_push = True
         repo.git.checkout("-b", branch_name)
 
-    return branch_name, first_push
+    return CheckoutResponse(
+        repo=repo,
+        branch_name=branch_name,
+        first_push=first_push,
+        local_path=local_path,
+    )
 
 
 def commit_changes_and_push(

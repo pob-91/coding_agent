@@ -26,8 +26,8 @@ COPY main.py /app
 COPY model/ /app/model/
 COPY utils/ /app/utils/
 COPY agent_ask_system_prompt.txt /app
-COPY issue_comment_system_prompt.txt /app
-COPY issue_comment_user_prompt_template.txt /app
+COPY agent_implement_system_prompt.txt /app
+COPY agent_implement_user_prompt_template.txt /app
 
 WORKDIR /app
 

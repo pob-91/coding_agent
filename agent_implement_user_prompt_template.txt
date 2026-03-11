@@ -10,23 +10,23 @@ Repository Guidelines (AGENTS.md):
 {{agents_md_content}}
 
 If AGENTS.md is present, you MUST follow its rules.
-If there is a conflict between the issue request and AGENTS.md, follow AGENTS.md.
+If there is a conflict between the task and AGENTS.md, follow AGENTS.md.
 
-Issue Title:
 {{issue_title}}
 
-Issue Description:
 {{issue_body}}
 
 Agent Command:
 {{agent_command}}
 
+{{code_diffs}}
+
 Your task:
 
-- Understand the issue.
+- Understand the goal.
 - Determine which files must change.
 - Use tools to retrieve only necessary context.
-- Modify only what is required to resolve the issue.
+- Modify only what is required to achieve the goal.
 - Commit your changes when complete.
 
 Constraints:
@@ -36,7 +36,7 @@ Constraints:
 - Preserve formatting and style conventions.
 - Avoid introducing new dependencies unless required.
 - Do not change public APIs unless explicitly required.
-- If tests exist and the issue implies a behavior change, update or add tests accordingly.
+- If tests exist and the goal implies a behavior change, update or add tests accordingly.
 - If insufficient context is available, call tools to retrieve it.
 
 When all changes are complete, call the commit tool with a brief commit message.
