@@ -132,7 +132,7 @@ async def run_agent_ask(
                             "type": "function_call_output",
                             "call_id": item.call_id,
                             "output": json.dumps(
-                                {"error": f"Invalid JSON arguments: {e}"}
+                                {"error": f"Invalid JSON arguments: {e}. Args must be JSON objects that adhere to the tool properties structure."}
                             ),
                         }
                     )
