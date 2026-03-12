@@ -20,6 +20,39 @@ The agent will:
 - Gather context using tools about the files in the repository
 - Generate a code patch that can be applied to the repository that addresses the issue
 
+#### /agent-ask
+
+The `/agent-ask` command triggers the agent to answer questions about the codebase. To use it, leave a comment on a PR (review comment or regular comment) with the following format:
+
+```
+/agent-ask what does the handle() method do in base_handler.py?
+```
+
+The agent will:
+- Checkout the PR branch
+- Read information about the repository structure and AGENTS.md if present
+- Use tools to search files, list directories, and read file contents
+- Respond with an answer to the question
+
+This is useful for asking questions about code context during code review without needing to manually explore the repository.
+
+#### /agent-update
+
+The `/agent-update` command triggers the coding agent to make changes to an existing PR. To use it, leave a comment on a PR (review comment or regular comment) with the following format:
+
+```
+/agent-update fix the typo in the function name
+```
+
+The agent will:
+- Checkout the PR branch
+- Read information about the repository and the code context from the review comment
+- Gather context using tools about the files in the repository
+- Generate a code patch and commit it directly to the existing PR branch
+- Comment on the PR with a summary of the changes
+
+This is useful for requesting quick fixes or updates to a PR without creating a new branch.
+
 ### TODO
 
 - Finally do an /agent-discuss flow where a chat in an app like Slack is passed to it along with the tools and project context. This agent can:
