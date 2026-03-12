@@ -174,7 +174,21 @@ async def run_agent_implement(
                 logger.info(f"Ignoring item in response: {item.type}")
                 continue
 
-            args: dict = json.loads(item.arguments)
+            try:
+                args: dict = json.loads(item.arguments)
+            except json.JSONDecodeError as e:
+                logger.warning(f"Received invalid JSON arguments: {e}")
+                messages.append(
+                    {
+                        "type": "function_call_output",
+                        "call_id": item.call_id,
+                        "output": json.dumps(
+                            {"error": f"Invalid JSON arguments: {e}. Args must be JSON objects that adhere to the tool properties structure."}
+                        ),
+                    }
+                )
+                continue
+
             logger.info(f"Calling function: {item.name}, with args: {item.arguments}")
 
             if item.name == "create_file":
