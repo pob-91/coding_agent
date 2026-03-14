@@ -1,10 +1,12 @@
 import os
+from contextlib import asynccontextmanager
 
 import uvicorn
 from dotenv import load_dotenv
 from fastapi import Depends, FastAPI, Header, HTTPException, Request
 from fastapi.responses import JSONResponse
 
+from data.db_handler import DBHandler
 from handlers.issue_handler import IssueCommentHandler
 from handlers.pr_comment_handler import PRCommentHandler
 from handlers.pr_review_handler import PRReviewHandler
@@ -16,7 +18,16 @@ load_dotenv()
 
 logger = get_logger(__name__)
 
-app = FastAPI(title="Webhook API", version="1.0.0")
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Startup: runs before the app starts accepting requests
+    DBHandler.setup_db()
+    yield
+    # Shutdown: runs when the app is shutting down (optional)
+
+
+app = FastAPI(title="Webhook API", version="1.0.0", lifespan=lifespan)
 
 AGENT_SECRET = os.getenv("AGENT_SECRET", None)
 

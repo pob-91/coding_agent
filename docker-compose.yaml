@@ -1,8 +1,20 @@
 services:
-  coding-agent:
-    image: coding-agent:latest
+  main-db:
+    image: couchdb:3
+    restart: always
+    environment:
+      - COUCHDB_USER=admin
+      - COUCHDB_PASSWORD=password
     ports:
-      - "8000:8000"
-    env_file:
-      - .env
-    restart: unless-stopped
+      - "5984:5984"
+    volumes:
+      - couchdb_data:/opt/couchdb/data
+    networks:
+      - internal-network
+
+volumes:
+  couchdb_data:
+
+networks:
+  internal-network:
+    name: internal-network

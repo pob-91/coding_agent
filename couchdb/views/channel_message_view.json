@@ -1,0 +1,8 @@
+{
+  "_id": "_design/channel_messages",
+  "views": {
+    "by_channel": {
+      "map": "function(doc) { if (doc.type === 'CHANNEL_MESSAGE') { emit([doc.channel_id, doc.index], null); } }"
+    }
+  }
+}
