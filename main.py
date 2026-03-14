@@ -12,6 +12,7 @@ from handlers.pr_comment_handler import PRCommentHandler
 from handlers.pr_review_handler import PRReviewHandler
 from model.webhook_message import WebhookMessage, WebhookMessageType
 from utils.logger import get_logger
+from utils.slack import verify_slack_signature
 
 load_dotenv()
 
@@ -109,6 +110,37 @@ async def git_webhook_handler(
 
     logger.warning(f"No handler for message type {message_type}")
     return JSONResponse(status_code=200, content={"status": "ok"})
+
+
+@app.post("/slack/events")
+async def slack_events(
+    request: Request,
+    x_slack_signature: str = Header(...),
+    x_slack_request_timestamp: str = Header(...),
+):
+    body = await request.body()
+
+    # Verify request is from Slack
+    if not verify_slack_signature(body, x_slack_signature, x_slack_request_timestamp):
+        raise HTTPException(status_code=403, detail="Invalid signature")
+
+    payload = await request.json()
+
+    # Handle URL verification challenge
+    if payload.get("type") == "url_verification":
+        return {"challenge": payload["challenge"]}
+
+    # Handle message events
+    if payload.get("type") == "event_callback":
+        event = payload.get("event", {})
+        if event.get("type") == "message":
+            # channel_id = event.get("channel")
+            # text = event.get("text")
+            # user = event.get("user")
+            # Process your message here
+            pass
+
+    return JSONResponse(status_code=200, content={"ok": True})
 
 
 if __name__ == "__main__":
