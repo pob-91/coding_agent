@@ -1,7 +1,6 @@
 import os
 import uuid
 from dataclasses import dataclass
-from typing import Tuple
 
 import requests
 from git import Repo
@@ -39,9 +38,34 @@ class CheckoutResponse:
 def clone_and_checkout(
     repo_name: str,
     clone_url: str,
-    branch_name: str,
+    branch_name: str | None = None,
+    is_planning_agent: bool = False,
 ) -> CheckoutResponse:
-    local_path = f"/tmp/{uuid.uuid4()}/{repo_name}"
+    if is_planning_agent:
+        local_path = f"/tmp/planning_agent/{repo_name}"
+    else:
+        local_path = f"/tmp/{uuid.uuid4()}/{repo_name}"
+
+    # If repo already exists, fetch and return early for planning agent
+    if os.path.exists(local_path):
+        repo = Repo(local_path)
+        current_branch = repo.active_branch.name
+        local_commit = repo.head.commit.hexsha
+
+        repo.git.fetch("-p")
+
+        if is_planning_agent:
+            remote_commit = repo.remotes.origin.refs[current_branch].commit.hexsha
+            if local_commit != remote_commit:
+                repo.git.pull("origin", current_branch)
+
+        return CheckoutResponse(
+            repo=repo,
+            branch_name=current_branch,
+            first_push=False,
+            local_path=local_path,
+        )
+
     repo = Repo.clone_from(clone_url, local_path, depth=1)
 
     origin = repo.remotes.origin
@@ -54,17 +78,19 @@ def clone_and_checkout(
     repo.git.fetch("origin", "--depth=1")
 
     first_push = False
-    remote_refs = [ref.remote_head for ref in origin.refs]
-    if branch_name in remote_refs:
-        # branch exists on the remote which means this is likely an update
-        repo.git.checkout("-B", branch_name, f"origin/{branch_name}")
-    else:
-        first_push = True
-        repo.git.checkout("-b", branch_name)
+
+    if branch_name is not None:
+        remote_refs = [ref.remote_head for ref in origin.refs]
+        if branch_name in remote_refs:
+            # branch exists on the remote which means this is likely an update
+            repo.git.checkout("-B", branch_name, f"origin/{branch_name}")
+        else:
+            first_push = True
+            repo.git.checkout("-b", branch_name)
 
     return CheckoutResponse(
         repo=repo,
-        branch_name=branch_name,
+        branch_name=repo.active_branch.name,
         first_push=first_push,
         local_path=local_path,
     )

@@ -2,6 +2,7 @@ import hashlib
 import hmac
 import os
 import time
+from typing import Any
 
 import requests
 
@@ -28,7 +29,7 @@ def send_slack_message(
     channel_id: str,
     text: str,
     token: str,
-):
+) -> Any:
     response = requests.post(
         "https://slack.com/api/chat.postMessage",
         headers={

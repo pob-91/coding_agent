@@ -14,15 +14,13 @@ from tools.read_file import read_file
 from tools.search import search
 from tools.tools import planning_tools
 from utils.logger import get_logger
+from utils.prompt import build_planning_user_prompt
+from utils.repo import CheckoutResponse, clone_and_checkout, prep_url
 from utils.slack import send_slack_message
 
 logger = get_logger(__name__)
 
 
-# TODO: Generate a system prompt and optionally a user prompt about the repo
-# TODO: Work out how to make sure that the message.text in the response is the last thing in the chain
-# TODO: If there is a channel_config, checkout the repo at the /tmp/planning/repo path if it does not already exist
-# TODO: Fetch and pull on the repo and checkout main
 # TODO: Add tool for the agent to checkout a different branch
 # TODO: Add tool for the agent to be able to search the web, there is a response type already in there, what is this?
 
@@ -38,20 +36,49 @@ class PlanningHandler:
             return
 
         event = payload.get("event", {})
-        logger.info(f"{event}")
         if event.get("type") != "message":
             return
+        if event.get("user") == workspace_config.bot_user_id:
+            # Don't amswer our own messages!
+            return
+        if event.get("subtype") is not None:
+            # New messages do not have this property
+            return
+
+        logger.info(f"Processing event: {event}")
 
         channel_id = event.get("channel")
         files = event.get("files")
         text = event.get("text")
 
         channel_config = DBHandler.get_channel_config(channel_id=channel_id)
+        repo_data: CheckoutResponse | None = None
+
+        if channel_config is not None:
+            clone_url = self._create_clone_url(
+                repo_name=channel_config.repo_name,
+            )
+            repo_data = clone_and_checkout(
+                repo_name=channel_config.repo_name,
+                clone_url=clone_url,
+                is_planning_agent=True,
+            )
+
+        with open("./agent_plan_system_prompt.txt", "r") as f:
+            system_prompt = f.read()
 
         messages: Iterable[Any] = [
             {"role": "system", "content": system_prompt},
-            {"role": "user", "content": user_prompt},
         ]
+
+        if repo_data is not None and channel_config is not None:
+            user_prompt = build_planning_user_prompt(
+                repo_name=channel_config.repo_name,
+                current_branch=repo_data.repo.active_branch.name,
+                local_path=repo_data.local_path,
+            )
+            messages.append({"role": "user", "content": user_prompt})
+
         db_messages = DBHandler.get_channel_messages(channel_id=channel_id)
         historic_messages: Iterable[Any] = [
             {"role": msg.role, "content": msg.body} for msg in db_messages
@@ -104,8 +131,8 @@ class PlanningHandler:
             response = await asyncio.to_thread(
                 client.responses.create,
                 model=os.getenv(
-                    "AGENT_MODEL",
-                    "moonshotai/kimi-k2-thinking",
+                    "PLANNING_MODEL",
+                    "openai/gpt-5.4",
                 ),
                 tools=planning_tools,
                 input=messages,
@@ -114,9 +141,11 @@ class PlanningHandler:
             for item in response.output:
                 if item.type == "message":
                     for msg in item.content:
-                        return_message += str(msg.text)
-                        answered = True
-                        break
+                        if msg.type != "output_text":
+                            continue
+                        return_message += msg.text
+                    answered = True
+                    break
 
                 if item.type != "function_call":
                     logger.info(f"Ignoring item in response: {item.type}")
@@ -151,6 +180,14 @@ class PlanningHandler:
                             channel_id=channel_id,
                         )
                     )
+                elif repo_data is None:
+                    messages.append(
+                        {
+                            "type": "function_call_output",
+                            "call_id": item.call_id,
+                            "output": f"Cannot call function: {item.name} as there is no repo associated with the channel. Get the repo name in the format user/repo_name an call the channel_config tool.",
+                        }
+                    )
                 elif item.name == "search":
                     messages.append(search(args, item, repo_data.local_path))
                 elif item.name == "list_files":
@@ -164,3 +201,12 @@ class PlanningHandler:
 
             if answered:
                 break
+
+        send_slack_message(
+            channel_id=channel_id,
+            text=return_message,
+            token=workspace_config.access_token,
+        )
+
+    def _create_clone_url(self, repo_name: str) -> str:
+        return prep_url(f"{os.getenv('REPO_BASE_URL')}/{repo_name}.git")

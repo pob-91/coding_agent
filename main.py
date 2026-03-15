@@ -139,8 +139,7 @@ async def slack_events(
         return JSONResponse(status_code=200, content={"ok": True})
 
     # We want to return to a slack event qucikly so this needs to be non blocking
-    loop = asyncio.get_event_loop()
-    loop.run_in_executor(None, PlanningHandler().handle_event, payload)
+    asyncio.create_task(PlanningHandler().handle_event(payload))
 
     return JSONResponse(status_code=200, content={"ok": True})
 

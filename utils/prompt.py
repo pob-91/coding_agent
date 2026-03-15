@@ -56,3 +56,20 @@ def build_implement_user_prompt(
     user_prompt = user_prompt.replace("{{agent_command}}", agent_command)
 
     return user_prompt
+
+
+def build_planning_user_prompt(
+    repo_name: str,
+    current_branch: str,
+    local_path: str,
+) -> str:
+    with open("./agent_plan_user_prompt_template.txt", "r") as f:
+        user_prompt = f.read()
+
+    user_prompt = user_prompt.replace("{{repo_name}}", repo_name)
+    user_prompt = user_prompt.replace("{{current_branch}}", current_branch)
+
+    file_tree = generate_top_level_file_tree(local_path)
+    user_prompt = user_prompt.replace("{{file_tree}}", file_tree)
+
+    return user_prompt

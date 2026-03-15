@@ -1,0 +1,8 @@
+You are working on the following repository:
+
+Repository Name: {{repo_name}}
+
+Current Branch: {{current_branch}}
+
+Repository Structure (top-level overview):
+{{file_tree}}
