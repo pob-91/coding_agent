@@ -1,12 +1,14 @@
 import json
 import os
 from typing import Tuple
+from venv import logger
 
 import requests
 
 from model.base_db_model import BaseDBModel
 from model.channel_config import ChannelConfig
 from model.channel_message import ChannelMessage
+from model.workspace_config import WorkspaceConfig
 
 
 class DBHandler:
@@ -20,8 +22,27 @@ class DBHandler:
     def write_model(model: BaseDBModel) -> None:
         if isinstance(model, ChannelConfig):
             return DBHandler._write_channel_config(model)
+        if isinstance(model, WorkspaceConfig):
+            return DBHandler._write_workspace_config(model)
 
         return DBHandler._write_generic_model(model)
+
+    @staticmethod
+    def get_workspace_config(team_id: str) -> WorkspaceConfig | None:
+        url = f"{DBHandler._get_db_url()}/{os.getenv('DB_NAME')}/{team_id}"
+        response = requests.get(
+            url=url,
+            auth=DBHandler._get_db_auth(),
+        )
+
+        if response.status_code == 404:
+            return None
+        if response.status_code != 200:
+            raise Exception(
+                f"Failed to get channel config: {response.status_code} - {response.text}"
+            )
+
+        return WorkspaceConfig.model_validate(response.json())
 
     @staticmethod
     def get_channel_config(channel_id: str) -> ChannelConfig | None:
@@ -130,6 +151,21 @@ class DBHandler:
     @staticmethod
     def _write_channel_config(config: ChannelConfig) -> None:
         url = f"{DBHandler._get_db_url()}/{os.getenv('DB_NAME')}/{config.channel_id}"
+
+        response = requests.put(
+            url=url,
+            auth=DBHandler._get_db_auth(),
+            json=config.model_dump(mode="json"),
+        )
+
+        if response.status_code not in (201, 202):
+            raise Exception(
+                f"Failed to create channel config: {response.status_code} - {response.text}"
+            )
+
+    @staticmethod
+    def _write_workspace_config(config: WorkspaceConfig) -> None:
+        url = f"{DBHandler._get_db_url()}/{os.getenv('DB_NAME')}/{config.team_id}"
 
         response = requests.put(
             url=url,

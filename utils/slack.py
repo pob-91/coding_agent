@@ -3,6 +3,8 @@ import hmac
 import os
 import time
 
+import requests
+
 
 def verify_slack_signature(body: bytes, signature: str, timestamp: str) -> bool:
     signing_secret = os.getenv("SLACK_SIGNING_SECRET", "")
@@ -20,3 +22,22 @@ def verify_slack_signature(body: bytes, signature: str, timestamp: str) -> bool:
     )
 
     return hmac.compare_digest(my_signature, signature)
+
+
+def send_slack_message(
+    channel_id: str,
+    text: str,
+    token: str,
+):
+    response = requests.post(
+        "https://slack.com/api/chat.postMessage",
+        headers={
+            "Authorization": f"Bearer {token}",
+            "Content-Type": "application/json",
+        },
+        json={
+            "channel": channel_id,
+            "text": text,
+        },
+    )
+    return response.json()

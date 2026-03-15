@@ -6,6 +6,7 @@ from pydantic import BaseModel, ConfigDict
 class DBModelType(Enum):
     CHANNEL_CONFIG = "CHANNEL_CONFIG"
     CHANNEL_MESSAGE = "CHANNEL_MESSAGE"
+    WORKSPACE_CONFIG = "WORKSPACE_CONFIG"
 
 
 class BaseDBModel(BaseModel):

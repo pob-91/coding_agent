@@ -1,16 +1,21 @@
+import asyncio
 import os
 from contextlib import asynccontextmanager
 
+import requests
 import uvicorn
 from dotenv import load_dotenv
 from fastapi import Depends, FastAPI, Header, HTTPException, Request
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, RedirectResponse
 
 from data.db_handler import DBHandler
 from handlers.issue_handler import IssueCommentHandler
+from handlers.planning_handler import PlanningHandler
 from handlers.pr_comment_handler import PRCommentHandler
 from handlers.pr_review_handler import PRReviewHandler
+from model.base_db_model import DBModelType
 from model.webhook_message import WebhookMessage, WebhookMessageType
+from model.workspace_config import WorkspaceConfig
 from utils.logger import get_logger
 from utils.slack import verify_slack_signature
 
@@ -75,7 +80,7 @@ async def root():
     }
 
 
-@app.post("/")
+@app.post("/gitea/events")
 async def git_webhook_handler(
     request: Request,
     _: bool = Depends(verify_webhook_auth),
@@ -130,22 +135,44 @@ async def slack_events(
     if payload.get("type") == "url_verification":
         return {"challenge": payload["challenge"]}
 
-    # Handle message events
-    if payload.get("type") == "event_callback":
-        event = payload.get("event", {})
-        if event.get("type") == "message":
-            # channel_id = event.get("channel")
-            # text = event.get("text")
-            # user = event.get("user")
-            # Process your message here
-            pass
+    if payload.get("type") != "event_callback":
+        return JSONResponse(status_code=200, content={"ok": True})
+
+    # We want to return to a slack event qucikly so this needs to be non blocking
+    loop = asyncio.get_event_loop()
+    loop.run_in_executor(None, PlanningHandler().handle_event, payload)
 
     return JSONResponse(status_code=200, content={"ok": True})
 
 
-if __name__ == "__main__":
-    # Load envs
+@app.get("/slack/oauth/callback")
+async def slack_oauth_callback(code: str):
+    # Exchange code for access token
+    response = requests.post(
+        "https://slack.com/api/oauth.v2.access",
+        data={
+            "client_id": os.getenv("SLACK_CLIENT_ID"),
+            "client_secret": os.getenv("SLACK_CLIENT_SECRET"),
+            "code": code,
+        },
+    )
 
+    data = response.json()
+    if data.get("ok"):
+        config = WorkspaceConfig(
+            type=DBModelType.WORKSPACE_CONFIG,
+            access_token=data["access_token"],
+            bot_user_id=data["bot_user_id"],
+            team_id=data["team"]["id"],
+        )
+        DBHandler.write_model(config)
+        logger.info(f"Added config for team {config.team_id}")
+
+    # Redirect
+    return RedirectResponse(url="https://slack.com/app_redirect?app=A0AM0VAUAHX")
+
+
+if __name__ == "__main__":
     # Run the server
     port = int(os.getenv("PORT", 8000))
     host = os.getenv("HOST", "0.0.0.0")
