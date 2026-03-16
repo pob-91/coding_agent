@@ -1,7 +1,6 @@
 import json
 import os
 from typing import Tuple
-from venv import logger
 
 import requests
 
@@ -24,6 +23,8 @@ class DBHandler:
             return DBHandler._write_channel_config(model)
         if isinstance(model, WorkspaceConfig):
             return DBHandler._write_workspace_config(model)
+        if isinstance(model, ChannelMessage):
+            return DBHandler._write_channel_message(model)
 
         return DBHandler._write_generic_model(model)
 
@@ -68,8 +69,8 @@ class DBHandler:
             url=url,
             auth=DBHandler._get_db_auth(),
             params={
-                "startkey": f'["{channel_id}", 0]',
-                "endkey": f'["{channel_id}", {{}}]',  # {} is "higher" than any number
+                "startkey": f'["{channel_id}", ""]',
+                "endkey": f'["{channel_id}", {{}}]',  # {} is "higher" than any string / number
                 "include_docs": "true",
             },
         )
@@ -81,6 +82,61 @@ class DBHandler:
 
         rows = response.json().get("rows", [])
         return [ChannelMessage.model_validate(row["doc"]) for row in rows]
+
+    @staticmethod
+    def delete_channel_message(message_id: str) -> None:
+        base_url = f"{DBHandler._get_db_url()}/{os.getenv('DB_NAME')}"
+
+        # First get the document to retrieve its _rev
+        get_response = requests.get(
+            url=f"{base_url}/{message_id}",
+            auth=DBHandler._get_db_auth(),
+        )
+
+        if get_response.status_code == 404:
+            return  # Already deleted
+        if get_response.status_code != 200:
+            raise Exception(f"Failed to get message: {get_response.status_code}")
+
+        rev = get_response.json()["_rev"]
+
+        # Delete with the _rev
+        delete_response = requests.delete(
+            url=f"{base_url}/{message_id}",
+            auth=DBHandler._get_db_auth(),
+            params={"rev": rev},
+        )
+
+        if delete_response.status_code not in (200, 202):
+            raise Exception(f"Failed to delete message: {delete_response.status_code}")
+
+    @staticmethod
+    def update_channel_message(message_id: str, new_body: str) -> None:
+        base_url = f"{DBHandler._get_db_url()}/{os.getenv('DB_NAME')}"
+
+        # First get the document to retrieve its _rev
+        get_response = requests.get(
+            url=f"{base_url}/{message_id}",
+            auth=DBHandler._get_db_auth(),
+        )
+
+        if get_response.status_code == 404:
+            return  # Doesn't exist
+        if get_response.status_code != 200:
+            raise Exception(f"Failed to get message: {get_response.status_code}")
+
+        doc = get_response.json()
+        doc["body"] = new_body
+
+        # PUT the updated doc with the _rev
+        update_response = requests.put(
+            url=f"{base_url}/{message_id}",
+            auth=DBHandler._get_db_auth(),
+            json=doc,  # Include the full doc with _rev
+        )
+
+        if update_response.status_code not in (200, 201, 202):
+            raise Exception(f"Failed to update message: {update_response.status_code}")
 
     # Private
     @staticmethod
@@ -175,7 +231,22 @@ class DBHandler:
 
         if response.status_code not in (201, 202):
             raise Exception(
-                f"Failed to create channel config: {response.status_code} - {response.text}"
+                f"Failed to create workspace config: {response.status_code} - {response.text}"
+            )
+
+    @staticmethod
+    def _write_channel_message(message: ChannelMessage) -> None:
+        url = f"{DBHandler._get_db_url()}/{os.getenv('DB_NAME')}/{message.message_id}"
+
+        response = requests.put(
+            url=url,
+            auth=DBHandler._get_db_auth(),
+            json=message.model_dump(mode="json"),
+        )
+
+        if response.status_code not in (201, 202):
+            raise Exception(
+                f"Failed to create channel message: {response.status_code} - {response.text}"
             )
 
     @staticmethod
@@ -190,5 +261,5 @@ class DBHandler:
 
         if response.status_code not in (201, 202):
             raise Exception(
-                f"Failed to create channel config: {response.status_code} - {response.text}"
+                f"Failed to create model: {response.status_code} - {response.text}"
             )

@@ -7,14 +7,18 @@ from openai import OpenAI
 
 from data.db_handler import DBHandler
 from model.base_db_model import DBModelType
+from model.channel_config import ChannelConfig
 from model.channel_message import ChannelMessage
 from tools.channel_config import channel_config as cc
 from tools.checkout_branch import checkout_branch
 from tools.list_branches import list_branches
 from tools.list_files import list_files
+from tools.post_issue import post_issue
 from tools.read_file import read_file
 from tools.search import search
 from tools.tools import planning_tools
+from tools.visit_site import visit_site
+from tools.web_search import web_search
 from utils.logger import get_logger
 from utils.prompt import build_planning_user_prompt
 from utils.repo import CheckoutResponse, clone_and_checkout, prep_url
@@ -23,9 +27,8 @@ from utils.slack import send_slack_message
 logger = get_logger(__name__)
 
 
-# TODO: Create search web tool that uses duck duck go
-# TODO: Create visit site tool that goes straight to a URL - probably want JS off and CSS, just get the HTML and convert to markdown
-# TODO: Add tool for the agent to be able to create an issue on the repo
+# TODO: Can you stream results to slack
+# TODO: Can you update responses to give the user an indication of what the agent is doing?
 
 
 class PlanningHandler:
@@ -39,20 +42,10 @@ class PlanningHandler:
             return
 
         event = payload.get("event", {})
-        if event.get("type") != "message":
-            return
-        if event.get("user") == workspace_config.bot_user_id:
-            # Don't amswer our own messages!
-            return
-        if event.get("subtype") is not None:
-            # New messages do not have this property
-            return
-
-        logger.info(f"Processing event: {event}")
-
         channel_id = event.get("channel")
         files = event.get("files")
         text = event.get("text")
+        message_id = event.get("ts")
 
         channel_config = DBHandler.get_channel_config(channel_id=channel_id)
         repo_data: CheckoutResponse | None = None
@@ -67,27 +60,39 @@ class PlanningHandler:
                 is_planning_agent=True,
             )
 
-        with open("./agent_plan_system_prompt.txt", "r") as f:
-            system_prompt = f.read()
+        messages = self._prep_messages(
+            repo_data=repo_data,
+            channel_config=channel_config,
+            channel_id=channel_id,
+        )
 
-        messages: Iterable[Any] = [
-            {"role": "system", "content": system_prompt},
-        ]
-
-        if repo_data is not None and channel_config is not None:
-            user_prompt = build_planning_user_prompt(
-                repo_name=channel_config.repo_name,
-                current_branch=repo_data.repo.active_branch.name,
-                local_path=repo_data.local_path,
+        if event.get("type") != "message":
+            return
+        if event.get("user") == workspace_config.bot_user_id:
+            # Don't amswer our own messages!
+            channel_message = ChannelMessage(
+                type=DBModelType.CHANNEL_MESSAGE,
+                message_id=message_id,
+                channel_id=channel_id,
+                body=text,
+                role="assistant",
             )
-            messages.append({"role": "user", "content": user_prompt})
+            DBHandler.write_model(channel_message)
+            return
+        if event.get("subtype") is not None:
+            # New messages do not have this property
+            if event.get("subtype") == "message_deleted":
+                id = event["previous_message"]["ts"]
+                DBHandler.delete_channel_message(id)
+                return
+            if event.get("subtype") == "message_changed":
+                original_ts = payload["event"]["message"]["ts"]
+                new_content = payload["event"]["message"]["text"]
+                DBHandler.update_channel_message(original_ts, new_content)
+                return
+            return
 
-        db_messages = DBHandler.get_channel_messages(channel_id=channel_id)
-        historic_messages: Iterable[Any] = [
-            {"role": msg.role, "content": msg.body} for msg in db_messages
-        ]
-
-        all_messages = messages + historic_messages
+        logger.info(f"Processing event: {event}")
 
         if text == "" and len(files) > 0:
             send_slack_message(
@@ -99,13 +104,13 @@ class PlanningHandler:
         elif len(text) > 0:
             channel_message = ChannelMessage(
                 type=DBModelType.CHANNEL_MESSAGE,
+                message_id=message_id,
                 channel_id=channel_id,
-                index=len(all_messages),
                 body=text,
                 role="user",
             )
             DBHandler.write_model(channel_message)
-            all_messages.append({"role": "user", "content": text})
+            messages.append({"role": "user", "content": text})
         else:
             send_slack_message(
                 channel_id=channel_id,
@@ -113,14 +118,6 @@ class PlanningHandler:
                 token=workspace_config.access_token,
             )
             return
-
-        if channel_config is None:
-            all_messages.append(
-                {
-                    "role": "system",
-                    "content": "IMPORTANT! The user has not yet configued the channel config so we cannot help them yet. Acknowledge their message but ask that they first provide you with the repo name in the format user/repo. We have the base repo URL so we will handle making sure it can work. Once they have given the repo name, call the channel_config tool and pass it as an argument.",
-                }
-            )
 
         client = OpenAI(
             base_url="https://openrouter.ai/api/v1",
@@ -142,7 +139,6 @@ class PlanningHandler:
             )
 
             for item in response.output:
-                item.type == "web_search_call"
                 if item.type == "message":
                     for msg in item.content:
                         if msg.type != "output_text":
@@ -154,6 +150,8 @@ class PlanningHandler:
                 if item.type != "function_call":
                     logger.info(f"Ignoring item in response: {item.type}")
                     continue
+
+                messages.extend(response.output)
 
                 try:
                     args: dict = json.loads(item.arguments)
@@ -184,7 +182,7 @@ class PlanningHandler:
                             channel_id=channel_id,
                         )
                     )
-                elif repo_data is None:
+                elif repo_data is None or channel_config is None:
                     messages.append(
                         {
                             "type": "function_call_output",
@@ -202,6 +200,13 @@ class PlanningHandler:
                     messages.append(checkout_branch(args, item, repo_data.repo))
                 elif item.name == "list_branches":
                     messages.append(list_branches(args, item, repo_data.repo))
+                elif item.name == "web_search":
+                    messages.append(web_search(args, item))
+                elif item.name == "visit_site":
+                    messages.append(visit_site(args, item))
+                elif item.name == "post_issue":
+                    repo_url = self._create_repo_url(channel_config.repo_name)
+                    messages.append(post_issue(args, item, repo_url))
                 else:
                     logger.warning(
                         f"planning-agent received unknown tool call: {item.name}"
@@ -217,4 +222,61 @@ class PlanningHandler:
         )
 
     def _create_clone_url(self, repo_name: str) -> str:
-        return prep_url(f"{os.getenv('REPO_BASE_URL')}/{repo_name}.git")
+        return prep_url(
+            os.path.join(
+                os.getenv("REPO_BASE_URL", ""),
+                f"{repo_name}.git",
+            )
+        )
+
+    def _create_repo_url(self, repo_name: str) -> str:
+        return prep_url(
+            os.path.join(
+                os.getenv("REPO_BASE_URL", ""),
+                "api/v1/repos",
+                repo_name,
+            )
+        )
+
+    def _prep_messages(
+        self,
+        repo_data: CheckoutResponse | None,
+        channel_config: ChannelConfig | None,
+        channel_id: str,
+    ) -> list:
+        with open("./agent_plan_system_prompt.txt", "r") as f:
+            system_prompt = f.read()
+
+        messages: Iterable[Any] = [
+            {"role": "system", "content": system_prompt},
+        ]
+
+        if repo_data is not None and channel_config is not None:
+            user_prompt = build_planning_user_prompt(
+                repo_name=channel_config.repo_name,
+                current_branch=repo_data.repo.active_branch.name,
+                local_path=repo_data.local_path,
+            )
+            messages.append({"role": "user", "content": user_prompt})
+
+        if channel_config is None:
+            messages.append(
+                {
+                    "role": "user",
+                    "content": "IMPORTANT! The user has not yet configued the channel config so we cannot help them yet. Acknowledge their message but ask that they first provide you with the repo name in the format user/repo. We have the base repo URL so we will handle making sure it can work. Once they have given the repo name, call the channel_config tool and pass it as an argument.",
+                }
+            )
+        else:
+            messages.append(
+                {
+                    "role": "user",
+                    "content": f"IMPORTANT! You are connected to the {channel_config.repo_name} repo so you do not need to ask the user for the repo name or call channel_config.",
+                }
+            )
+
+        db_messages = DBHandler.get_channel_messages(channel_id=channel_id)
+        historic_messages: Iterable[Any] = [
+            {"role": msg.role, "content": msg.body} for msg in db_messages
+        ]
+
+        return messages + historic_messages

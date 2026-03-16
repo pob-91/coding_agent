@@ -67,7 +67,7 @@ async def _wrap_up(
     commit_message: str | None,
 ) -> None:
     if source.issue is not None:
-        if not await create_pull_request(
+        if not create_pull_request(
             repo_url=repo_url,
             base_branch=repository.default_branch,
             issue_branch=repo_data.branch_name,
@@ -183,7 +183,9 @@ async def run_agent_implement(
                         "type": "function_call_output",
                         "call_id": item.call_id,
                         "output": json.dumps(
-                            {"error": f"Invalid JSON arguments: {e}. Args must be JSON objects that adhere to the tool properties structure."}
+                            {
+                                "error": f"Invalid JSON arguments: {e}. Args must be JSON objects that adhere to the tool properties structure."
+                            }
                         ),
                     }
                 )

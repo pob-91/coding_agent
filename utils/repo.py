@@ -215,17 +215,16 @@ def get_most_recent_review_comments(
     return [PullReviewComment.model_validate(c) for c in response.json()]
 
 
-async def create_pull_request(
+def create_pull_request(
     repo_url: str,
     base_branch: str,
     issue_branch: str,
     issue_title: str,
 ) -> bool:
-    # https://git.thesanders.farm/api/v1/repos/nerd/coding_agent
     url = os.path.join(repo_url, "pulls")
 
     # Get the label to use
-    label_id = await _get_ai_agent_label(repo_url)
+    label_id = _get_ai_agent_label(repo_url)
 
     response = requests.post(
         url=url,
@@ -247,7 +246,26 @@ async def create_pull_request(
     return response.status_code == 201
 
 
-async def _get_ai_agent_label(repo_url: str) -> int | None:
+def create_issue(repo_url: str, title: str, body: str) -> bool:
+    label_id = _get_ai_agent_label(repo_url)
+
+    url = os.path.join(repo_url, "issues")
+    result = requests.post(
+        url=url,
+        headers={
+            "Content-Type": "application/json",
+        },
+        json={
+            "title": title,
+            "body": body,
+            "labels": [label_id],
+        },
+    )
+
+    return result.status_code == 201
+
+
+def _get_ai_agent_label(repo_url: str) -> int | None:
     labels_url = os.path.join(repo_url, "labels")
 
     labels_response = requests.get(

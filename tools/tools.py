@@ -339,4 +339,56 @@ planning_tools: Iterable[Any] = [
         "description": "List all available branches in the current repo.",
         "parameters": {},
     },
+    {
+        "type": "function",
+        "name": "web_search",
+        "description": "Get web search results for a specific search phrase.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "phrase": {
+                    "type": "string",
+                    "description": "The web search phrase.",
+                },
+            },
+            "required": ["phrase"],
+            "additionalProperties": False,
+        },
+    },
+    {
+        "type": "function",
+        "name": "visit_site",
+        "description": "Get the full contents of a webpage.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "url": {
+                    "type": "string",
+                    "description": "A fully qualified web url e.g. https://google.com",
+                },
+            },
+            "required": ["url"],
+            "additionalProperties": False,
+        },
+    },
+    {
+        "type": "function",
+        "name": "post_issue",
+        "description": "Post an issue that triggers the coding agent to implement the described change.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "title": {
+                    "type": "string",
+                    "description": "The title of the issue. This should be brief as it becomes the branch and PR name, try to keep it to no more than 4 words.",
+                },
+                "body": {
+                    "type": "string",
+                    "description": "The description of the issue. This should be aimed at the coding agent and include very specific instructions on what to implement.",
+                },
+            },
+            "required": ["title", "body"],
+            "additionalProperties": False,
+        },
+    },
 ]
