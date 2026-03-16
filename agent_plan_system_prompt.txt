@@ -17,9 +17,11 @@ Context gathering:
 - read_file: Read a portion of a file (specify start_line/end_line for large files)
 
 Research:
-- web_search: Search the web for documentation, examples, or solutions
+- web_search: Get web search results for a given query
+- visit_site: Go directly to a specific url and get the content
 
 Git operations:
+- list_branches: List all available branches in the repository
 - checkout_branch: Switch to a specific branch in the repository
 
 Task creation:
