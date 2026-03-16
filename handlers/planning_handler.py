@@ -21,8 +21,9 @@ from utils.slack import send_slack_message
 logger = get_logger(__name__)
 
 
-# TODO: Add tool for the agent to checkout a different branch
+# TODO: Add tool for the agent to list all branches
 # TODO: Add tool for the agent to be able to search the web, there is a response type already in there, what is this?
+# TODO: Add tool for the agent to be able to create an issue on the repo
 
 
 class PlanningHandler:

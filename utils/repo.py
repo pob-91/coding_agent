@@ -96,6 +96,21 @@ def clone_and_checkout(
     )
 
 
+def checkout_branch(repo: Repo, branch_name: str) -> None:
+    current_branch = repo.active_branch.name
+
+    if current_branch != branch_name:
+        repo.git.checkout("-B", branch_name, f"origin/{branch_name}")
+
+    repo.git.fetch("-p")
+
+    local_commit = repo.head.commit.hexsha
+    remote_commit = repo.remotes.origin.refs[current_branch].commit.hexsha
+
+    if local_commit != remote_commit:
+        repo.git.pull("origin", current_branch)
+
+
 def commit_changes_and_push(
     repo: Repo,
     branch_name: str,

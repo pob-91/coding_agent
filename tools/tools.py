@@ -317,4 +317,20 @@ planning_tools: Iterable[Any] = [
             "additionalProperties": False,
         },
     },
+    {
+        "type": "function",
+        "name": "checkout_branch",
+        "description": "Checkout a specific branch in the current repository.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "branch_name": {
+                    "type": "string",
+                    "description": "The name of the branch to checkout.",
+                },
+            },
+            "required": ["branch_name"],
+            "additionalProperties": False,
+        },
+    },
 ]
