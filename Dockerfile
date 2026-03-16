@@ -7,6 +7,8 @@ ENV PYTHONPATH=/app
 
 WORKDIR /app
 
+RUN apk add --no-cache gcc musl-dev libgcc rust cargo
+
 RUN --mount=type=bind,source=pyproject.toml,target=pyproject.toml \
     --mount=type=bind,source=uv.lock,target=uv.lock \
     --mount=type=cache,target=/root/.cache/uv \
@@ -25,6 +27,12 @@ ENV VIRTUAL_ENV=/app/.venv
 COPY main.py /app
 COPY model/ /app/model/
 COPY utils/ /app/utils/
+COPY data/ /app/data/
+COPY flows/ /app/flows/
+COPY handlers/ /app/handlers/
+COPY tools/ /app/tools/
+COPY couchdb/views/ /app/couchdb/views
+
 COPY agent_ask_system_prompt.txt /app
 COPY agent_implement_system_prompt.txt /app
 COPY agent_implement_user_prompt_template.txt /app

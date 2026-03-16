@@ -55,12 +55,9 @@ This is useful for requesting quick fixes or updates to a PR without creating a 
 
 ### TODO
 
-- Finally do an /agent-discuss flow where a chat in an app like Slack is passed to it along with the tools and project context. This agent can:
-  - Discuss the project overall
-  - Talk about architecture
-  - Plan new features
-  - Draft and add issues for the other agent to implement
-
+- Streaming to slack (if possible)
+- UI updates to tell the user what the agent is doing
+- Audio support for recorded voice snippets
 
 ### Future Features
 
