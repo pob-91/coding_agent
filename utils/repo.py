@@ -96,6 +96,14 @@ def clone_and_checkout(
     )
 
 
+def list_all_branches(repo: Repo) -> list[str]:
+    local = [branch.name for branch in repo.branches]
+    remote = [ref.remote_head for ref in repo.remotes.origin.refs]
+
+    # Combine and remove duplicates
+    return list(set(local + remote))
+
+
 def checkout_branch(repo: Repo, branch_name: str) -> None:
     current_branch = repo.active_branch.name
 

@@ -9,6 +9,8 @@ from data.db_handler import DBHandler
 from model.base_db_model import DBModelType
 from model.channel_message import ChannelMessage
 from tools.channel_config import channel_config as cc
+from tools.checkout_branch import checkout_branch
+from tools.list_branches import list_branches
 from tools.list_files import list_files
 from tools.read_file import read_file
 from tools.search import search
@@ -21,8 +23,8 @@ from utils.slack import send_slack_message
 logger = get_logger(__name__)
 
 
-# TODO: Add tool for the agent to list all branches
-# TODO: Add tool for the agent to be able to search the web, there is a response type already in there, what is this?
+# TODO: Create search web tool that uses duck duck go
+# TODO: Create visit site tool that goes straight to a URL - probably want JS off and CSS, just get the HTML and convert to markdown
 # TODO: Add tool for the agent to be able to create an issue on the repo
 
 
@@ -140,6 +142,7 @@ class PlanningHandler:
             )
 
             for item in response.output:
+                item.type == "web_search_call"
                 if item.type == "message":
                     for msg in item.content:
                         if msg.type != "output_text":
@@ -195,6 +198,10 @@ class PlanningHandler:
                     messages.append(list_files(args, item, repo_data.local_path))
                 elif item.name == "read_file":
                     messages.append(read_file(args, item, repo_data.local_path))
+                elif item.name == "checkout_branch":
+                    messages.append(checkout_branch(args, item, repo_data.repo))
+                elif item.name == "list_branches":
+                    messages.append(list_branches(args, item, repo_data.repo))
                 else:
                     logger.warning(
                         f"planning-agent received unknown tool call: {item.name}"

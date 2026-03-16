@@ -333,4 +333,10 @@ planning_tools: Iterable[Any] = [
             "additionalProperties": False,
         },
     },
+    {
+        "type": "function",
+        "name": "list_branches",
+        "description": "List all available branches in the current repo.",
+        "parameters": {},
+    },
 ]

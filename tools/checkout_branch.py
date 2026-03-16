@@ -23,6 +23,11 @@ def checkout_branch(args: dict, item: Any, repo: Repo) -> dict:
             repo=repo,
             branch_name=args["branch_name"],
         )
+        return {
+            "type": "function_call_output",
+            "call_id": item.call_id,
+            "output": f"Branch {args['branch_name']} checked out successfully.",
+        }
     except Exception as e:
         return {
             "type": "function_call_output",
@@ -31,9 +36,3 @@ def checkout_branch(args: dict, item: Any, repo: Repo) -> dict:
                 {"error": f"Failed to checkout branch with error {e}"}
             ),
         }
-
-    return {
-        "type": "function_call_output",
-        "call_id": item.call_id,
-        "output": f"Branch {args['branch_name']} checked out successfully.",
-    }
