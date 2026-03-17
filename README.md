@@ -53,6 +53,10 @@ The agent will:
 
 This is useful for requesting quick fixes or updates to a PR without creating a new branch.
 
+### Slack Integration
+
+This coding agent expects to be integrated with Slack for notifications and interactions. See the environment variables in `.env.example` for the required Slack configuration (SLACK_SIGNING_SECRET, SLACK_CLIENT_ID, SLACK_CLIENT_SECRET).
+
 ### TODO
 
 - Streaming to slack (if possible)
