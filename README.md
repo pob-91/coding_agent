@@ -55,7 +55,23 @@ This is useful for requesting quick fixes or updates to a PR without creating a 
 
 ### Slack Integration
 
-This coding agent expects to be integrated with Slack for notifications and interactions. See the environment variables in `.env.example` for the required Slack configuration (SLACK_SIGNING_SECRET, SLACK_CLIENT_ID, SLACK_CLIENT_SECRET).
+This coding agent can optionally integrate with Slack for notifications and interactions. Slack integration is optional. See the "Environment Variables" section for configuration details.
+
+### Database (CouchDB)
+
+CouchDB is the required database for this application. The following environment variables must be configured: `DB_URL`, `DB_USER`, `DB_PASSWORD`, and `DB_NAME`. See the "Environment Variables" section for CouchDB configuration details.
+
+### Environment Variables
+
+| Name | Description | Required |
+| :------------------ | :-------------------------------------------------------------------------------------------------------------------------------------------------- | :------- |
+| `SLACK_SIGNING_SECRET` | The signing secret for Slack API requests. | No |
+| `SLACK_CLIENT_ID` | The client ID for your Slack app. | No |
+| `SLACK_CLIENT_SECRET` | The client secret for your Slack app. | No |
+| `DB_URL` | The URL for the CouchDB instance (e.g., `main-db:5984`). | Yes |
+| `DB_USER` | The username for CouchDB authentication. | Yes |
+| `DB_PASSWORD` | The password for CouchDB authentication. | Yes |
+| `DB_NAME` | The name of the database to use within CouchDB. | Yes |
 
 ### TODO
 
