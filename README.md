@@ -65,6 +65,14 @@ CouchDB is the required database for this application. The following environment
 
 | Name | Description | Required |
 | :------------------ | :-------------------------------------------------------------------------------------------------------------------------------------------------- | :------- |
+| `REPO_BASE_URL` | The base URL for the Git repository (e.g., `github.com` or `gitea.example.com`). Used to construct clone URLs and API endpoints. | Yes |
+| `AGENT_TOKEN` | The authentication token for the agent to access repositories. Used with `AGENT_USERNAME` for Git operations. | Yes |
+| `AGENT_USERNAME` | The username for the agent to access repositories. Used with `AGENT_TOKEN` for Git operations. | Yes |
+| `AGENT_SECRET` | The secret token for webhook authentication. Used to verify incoming webhook requests. | Yes |
+| `OPEN_ROUTER_API_KEY` | The API key for OpenRouter (LLM API provider). Used to authenticate with the OpenRouter API for model inference. | Yes |
+| `AGENT_MODEL` | The model to use for coding tasks. Defaults to `moonshotai/kimi-k2-thinking`. | No |
+| `PLANNING_MODEL` | The model to use for planning tasks. Defaults to `openai/gpt-5.4`. | No |
+| `ADMIN_SECRET` | The secret token for admin endpoints. Used to verify admin API requests. | No |
 | `SLACK_SIGNING_SECRET` | The signing secret for Slack API requests. | No |
 | `SLACK_CLIENT_ID` | The client ID for your Slack app. | No |
 | `SLACK_CLIENT_SECRET` | The client secret for your Slack app. | No |
