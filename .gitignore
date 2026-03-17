@@ -1,5 +1,6 @@
 .env
 .venv
 .nerd-token
+.env.docker
 
 __pycache__

@@ -171,6 +171,45 @@ async def slack_oauth_callback(code: str):
     return RedirectResponse(url="https://slack.com/app_redirect?app=A0AM0VAUAHX")
 
 
+async def verify_admin_auth(authorization: str | None = Header(None)):
+    if not os.getenv("ADMIN_SECRET"):
+        raise HTTPException(
+            status_code=500,
+            detail="ADMIN_SECRET env var is not configured",
+        )
+
+    if not authorization:
+        raise HTTPException(status_code=401, detail="Missing Authorization header")
+
+    if not authorization.startswith("Bearer "):
+        raise HTTPException(
+            status_code=401,
+            detail="Invalid Authorization header format. Expected 'Bearer <token>'",
+        )
+
+    token = authorization[7:]  # Remove "Bearer " prefix
+
+    if token != os.getenv("ADMIN_SECRET"):
+        raise HTTPException(status_code=403, detail="Invalid bearer token")
+
+    return True
+
+
+@app.post("/admin/workspace")
+async def create_workspace_config(
+    request: Request,
+    _: bool = Depends(verify_admin_auth),
+):
+    json = await request.json()
+    config = WorkspaceConfig.model_validate(json)
+    DBHandler.write_model(config)
+
+    return JSONResponse(
+        status_code=201,
+        content=config.model_dump(mode="json"),
+    )
+
+
 if __name__ == "__main__":
     # Run the server
     port = int(os.getenv("PORT", 8000))
