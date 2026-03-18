@@ -230,7 +230,7 @@ class PlanningHandler:
                     tool_response = search(args, item, repo_data.local_path)
                     send_slack_message(
                         channel_id=channel_id,
-                        text=f"_AGENT STATUS: currently searching repository for \"{args.get('query', '')}\"_",
+                        text=f'_AGENT STATUS: currently searching repository for "{args.get("query", "")}"_',
                         token=workspace_config.access_token,
                     )
                 elif item.name == "list_files":
@@ -265,7 +265,7 @@ class PlanningHandler:
                     tool_response = web_search(args, item)
                     send_slack_message(
                         channel_id=channel_id,
-                        text=f"_AGENT STATUS: currently performing web search for \"{args.get('query', '')}\"_",
+                        text=f'_AGENT STATUS: currently performing web search for "{args.get("phrase", "")}"_',
                         token=workspace_config.access_token,
                     )
                 elif item.name == "visit_site":
@@ -280,7 +280,7 @@ class PlanningHandler:
                     tool_response = post_issue(args, item, repo_url)
                     send_slack_message(
                         channel_id=channel_id,
-                        text=f"_AGENT STATUS: currently posting issue \"{args.get('title', '')}\"_",
+                        text=f'_AGENT STATUS: currently posting issue "{args.get("title", "")}"_',
                         token=workspace_config.access_token,
                     )
                 else:
