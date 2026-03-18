@@ -112,7 +112,7 @@ issue_tools: Iterable[Any] = [
     {
         "type": "function",
         "name": "create_file",
-        "description": "Create a new file at the given path. Optionally provide initial text content.",
+        "description": "Create a new file at the given path. Automatically creates any necessary subdirectories. Optionally provide initial text content.",
         "parameters": {
             "type": "object",
             "properties": {
