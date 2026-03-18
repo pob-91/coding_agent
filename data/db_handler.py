@@ -111,6 +111,45 @@ class DBHandler:
             raise Exception(f"Failed to delete message: {delete_response.status_code}")
 
     @staticmethod
+    def delete_messages_by_trigger(triggering_message_id: str) -> None:
+        """Delete all messages associated with a triggering Slack message."""
+        base_url = f"{DBHandler._get_db_url()}/{os.getenv('DB_NAME')}"
+
+        # Query the view to get all related docs
+        view_url = f"{base_url}/_design/channel_messages_by_trigger/_view/by_trigger"
+        response = requests.get(
+            url=view_url,
+            auth=DBHandler._get_db_auth(),
+            params={
+                "key": f'"{triggering_message_id}"',
+                "include_docs": "true",
+            },
+        )
+
+        if response.status_code != 200:
+            raise Exception(f"Failed to query view: {response.status_code}")
+
+        rows = response.json().get("rows", [])
+        if len(rows) == 0:
+            return
+
+        # Build bulk delete payload
+        docs_to_delete = [
+            {"_id": row["doc"]["_id"], "_rev": row["doc"]["_rev"], "_deleted": True}
+            for row in rows
+        ]
+
+        # Bulk delete
+        bulk_response = requests.post(
+            url=f"{base_url}/_bulk_docs",
+            auth=DBHandler._get_db_auth(),
+            json={"docs": docs_to_delete},
+        )
+
+        if bulk_response.status_code not in (200, 201):
+            raise Exception(f"Failed to bulk delete: {bulk_response.status_code}")
+
+    @staticmethod
     def update_channel_message(message_id: str, new_body: str) -> None:
         base_url = f"{DBHandler._get_db_url()}/{os.getenv('DB_NAME')}"
 
@@ -171,11 +210,12 @@ class DBHandler:
 
     @staticmethod
     def _setup_views() -> None:
-        DBHandler._setup_channel_messages_view()
+        DBHandler._setup_view("couchdb/views/channel_message_view.json")
+        DBHandler._setup_view("couchdb/views/channel_messages_by_trigger.json")
 
     @staticmethod
-    def _setup_channel_messages_view() -> None:
-        with open("couchdb/views/channel_message_view.json", "r") as f:
+    def _setup_view(path: str) -> None:
+        with open(path, "r") as f:
             view_doc = json.load(f)
 
         doc_id = view_doc["_id"]

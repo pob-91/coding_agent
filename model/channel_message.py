@@ -12,5 +12,8 @@ class ChannelMessage(BaseDBModel):
     channel_id: str
     body: str
     role: Literal["user", "assistant", "tool_call", "tool_output"]
+
+    # tools specific properties
     call_id: str | None = None
     tool_name: str | None = None
+    triggering_message_id: str | None = None

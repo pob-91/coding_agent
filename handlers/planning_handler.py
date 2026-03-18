@@ -23,7 +23,6 @@ from utils.logger import get_logger
 from utils.prompt import build_planning_user_prompt
 from utils.repo import CheckoutResponse, clone_and_checkout, prep_url
 from utils.slack import send_slack_message
-from utils.time import generate_ts
 
 logger = get_logger(__name__)
 
@@ -67,12 +66,25 @@ class PlanningHandler:
             return
         if event.get("user") == workspace_config.bot_user_id:
             # Don't amswer our own messages!
+            channel_message = ChannelMessage(
+                type=DBModelType.CHANNEL_MESSAGE,
+                message_id=message_id,
+                channel_id=channel_id,
+                body=text,
+                role="assistant",
+            )
+            DBHandler.write_model(channel_message)
             return
         if event.get("subtype") is not None:
             # New messages do not have this property
             if event.get("subtype") == "message_deleted":
                 id = event["previous_message"]["ts"]
-                DBHandler.delete_channel_message(id)
+                DBHandler.delete_channel_message(
+                    id
+                )  # This deletes the slack message from the DB
+                DBHandler.delete_messages_by_trigger(
+                    id
+                )  # This deletes all associated tool messages
                 return
             if event.get("subtype") == "message_changed":
                 original_ts = payload["event"]["message"]["ts"]
@@ -113,6 +125,8 @@ class PlanningHandler:
             api_key=os.getenv("OPEN_ROUTER_API_KEY"),
         )
 
+        internal_message_sequence_number = 0
+
         while True:
             response = await asyncio.to_thread(
                 client.responses.create,
@@ -121,25 +135,10 @@ class PlanningHandler:
                 input=messages,
             )
 
-            if response.status == "completed":
-                message = ""
-                for item in response.output:
-                    if item.type != "message":
-                        continue
-                    for msg in item.content:
-                        if msg.type != "output_text":
-                            continue
-                        message += msg.text
-                if len(message) > 0:
-                    send_slack_message(
-                        channel_id=channel_id,
-                        text=message,
-                        token=workspace_config.access_token,
-                    )
-                break
-
             has_tool_calls = False
             for item in response.output:
+                logger.info(f"Handling response type of {item.type}")
+
                 if item.type == "message":
                     message = ""
                     for msg in item.content:
@@ -160,13 +159,16 @@ class PlanningHandler:
 
                 has_tool_calls = True
 
-                messages.extend(response.output)
+                messages.append(item)
+                internal_message_sequence_number += 1
                 self._save_internal_tool_message(
+                    message_id=f"{message_id}_{internal_message_sequence_number:03d}",
+                    triggering_message_id=message_id,
                     channel_id=channel_id,
                     role="tool_call",
                     call_id=item.call_id,
                     tool_name=item.name,
-                    content=json.dumps(response.output),
+                    content=item.arguments,
                 )
 
                 try:
@@ -183,7 +185,10 @@ class PlanningHandler:
                         ),
                     }
                     messages.append(tool_response)
+                    internal_message_sequence_number += 1
                     self._save_internal_tool_message(
+                        message_id=f"{message_id}_{internal_message_sequence_number:03d}",
+                        triggering_message_id=message_id,
                         channel_id=channel_id,
                         role="tool_output",
                         call_id=item.call_id,
@@ -238,7 +243,10 @@ class PlanningHandler:
 
                 if save:
                     messages.append(tool_response)
+                    internal_message_sequence_number += 1
                     self._save_internal_tool_message(
+                        message_id=f"{message_id}_{internal_message_sequence_number:03d}",
+                        triggering_message_id=message_id,
                         channel_id=channel_id,
                         role="tool_output",
                         call_id=item.call_id,
@@ -247,7 +255,7 @@ class PlanningHandler:
                     )
 
             if not has_tool_calls:
-                # This should never happen - or odd if it does
+                logger.info("No tool was called in the last loop so stopping.")
                 break
 
     def _create_clone_url(self, repo_name: str) -> str:
@@ -333,6 +341,8 @@ class PlanningHandler:
 
     def _save_internal_tool_message(
         self,
+        message_id: str,
+        triggering_message_id,
         channel_id: str,
         role: Literal["tool_call", "tool_output"],
         call_id: str,
@@ -342,10 +352,11 @@ class PlanningHandler:
         message = ChannelMessage(
             type=DBModelType.CHANNEL_MESSAGE,
             channel_id=channel_id,
-            message_id=generate_ts(),
+            message_id=message_id,
             body=content,
             role=role,
             call_id=call_id,
             tool_name=tool_name,
+            triggering_message_id=triggering_message_id,
         )
         DBHandler.write_model(message)

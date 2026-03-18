@@ -1,4 +1,5 @@
 import os
+import re
 import uuid
 from dataclasses import dataclass
 
@@ -23,7 +24,10 @@ def prep_url(raw: str) -> str:
 
 
 def prep_issue_branch_name(issue_title: str) -> str:
-    prepped_title = issue_title.lower().replace(" ", "_")
+    prepped_title = re.sub(
+        r"[^a-z0-9_]", "", issue_title.lower().replace("-", "_").replace(" ", "_")
+    )
+
     return f"issue/{prepped_title}"
 
 

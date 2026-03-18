@@ -1,0 +1,8 @@
+{
+  "_id": "_design/channel_messages_by_trigger",
+  "views": {
+    "by_trigger": {
+      "map": "function(doc) { if (doc.type === 'CHANNEL_MESSAGE' && doc.triggering_message_id) { emit(doc.triggering_message_id, null); } }"
+    }
+  }
+}
