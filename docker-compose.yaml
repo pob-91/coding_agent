@@ -1,5 +1,8 @@
 services:
   main-db:
+    profiles:
+      - dev
+      - test
     image: couchdb:3
     restart: always
     environment:
@@ -13,6 +16,8 @@ services:
       - internal-network
 
   coding-agent:
+    profiles:
+      - test
     image: coding-agent:latest
     env_file:
       - .env.docker

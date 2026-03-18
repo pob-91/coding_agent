@@ -4,11 +4,19 @@ build:
 
 .PHONY: up
 up:
-	docker compose up -d
+	docker compose --profile dev up -d
+
+.PHONY: up-all
+up-all:
+	docker compose --profile test up -d
 
 .PHONY: down
 down:
-	docker compose down -v
+	docker compose --profile dev down -v
+
+.PHONY: down-all
+down-all:
+	docker compose --profile test down -v
 
 .PHONY: trash
 trash:

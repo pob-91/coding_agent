@@ -1,7 +1,8 @@
 import asyncio
 import json
 import os
-from typing import Any, Iterable
+from tkinter.constants import TRUE
+from typing import Any, Iterable, Literal
 
 from openai import OpenAI
 
@@ -23,12 +24,9 @@ from utils.logger import get_logger
 from utils.prompt import build_planning_user_prompt
 from utils.repo import CheckoutResponse, clone_and_checkout, prep_url
 from utils.slack import send_slack_message
+from utils.time import generate_ts
 
 logger = get_logger(__name__)
-
-
-# TODO: Can you stream results to slack
-# TODO: Can you update responses to give the user an indication of what the agent is doing?
 
 
 class PlanningHandler:
@@ -70,14 +68,6 @@ class PlanningHandler:
             return
         if event.get("user") == workspace_config.bot_user_id:
             # Don't amswer our own messages!
-            channel_message = ChannelMessage(
-                type=DBModelType.CHANNEL_MESSAGE,
-                message_id=message_id,
-                channel_id=channel_id,
-                body=text,
-                role="assistant",
-            )
-            DBHandler.write_model(channel_message)
             return
         if event.get("subtype") is not None:
             # New messages do not have this property
@@ -124,49 +114,82 @@ class PlanningHandler:
             api_key=os.getenv("OPEN_ROUTER_API_KEY"),
         )
 
-        return_message: str = ""
-        answered: bool = False
-
         while True:
             response = await asyncio.to_thread(
                 client.responses.create,
-                model=os.getenv(
-                    "PLANNING_MODEL",
-                    "openai/gpt-5.4",
-                ),
+                model=os.getenv("PLANNING_MODEL", ""),
                 tools=planning_tools,
                 input=messages,
             )
 
-            for item in response.output:
-                if item.type == "message":
+            if response.status == "completed":
+                message = ""
+                for item in response.output:
+                    if item.type != "message":
+                        continue
                     for msg in item.content:
                         if msg.type != "output_text":
                             continue
-                        return_message += msg.text
-                    answered = True
-                    break
+                        message += msg.text
+                if len(message) > 0:
+                    send_slack_message(
+                        channel_id=channel_id,
+                        text=message,
+                        token=workspace_config.access_token,
+                    )
+                break
+
+            has_tool_calls = False
+            for item in response.output:
+                if item.type == "message":
+                    message = ""
+                    for msg in item.content:
+                        if msg.type != "output_text":
+                            continue
+                        message += msg.text
+                    if len(message) > 0:
+                        send_slack_message(
+                            channel_id=channel_id,
+                            text=message,
+                            token=workspace_config.access_token,
+                        )
+                    continue
 
                 if item.type != "function_call":
                     logger.info(f"Ignoring item in response: {item.type}")
                     continue
 
+                has_tool_calls = True
+
                 messages.extend(response.output)
+                self._save_internal_tool_message(
+                    channel_id=channel_id,
+                    role="tool_call",
+                    call_id=item.call_id,
+                    tool_name=item.name,
+                    content=json.dumps(response.output),
+                )
 
                 try:
                     args: dict = json.loads(item.arguments)
                 except json.JSONDecodeError as e:
                     logger.warning(f"agent-ask received invalid JSON arguments: {e}")
-                    messages.append(
-                        {
-                            "type": "function_call_output",
-                            "call_id": item.call_id,
-                            "output": json.dumps(
-                                {
-                                    "error": f"Invalid JSON arguments: {e}. Args must be JSON objects that adhere to the tool properties structure."
-                                }
-                            ),
-                        }
+                    tool_response = {
+                        "type": "function_call_output",
+                        "call_id": item.call_id,
+                        "output": json.dumps(
+                            {
+                                "error": f"Invalid JSON arguments: {e}. Args must be JSON objects that adhere to the tool properties structure."
+                            }
+                        ),
+                    }
+                    messages.append(tool_response)
+                    self._save_internal_tool_message(
+                        channel_id=channel_id,
+                        role="tool_output",
+                        call_id=item.call_id,
+                        tool_name=item.name,
+                        content=json.dumps(tool_response),
                     )
                     continue
 
@@ -174,13 +197,14 @@ class PlanningHandler:
                     f"planning-handler calling: {item.name}, args: {item.arguments}"
                 )
 
+                tool_response: dict = {}
+                save = True
+
                 if item.name == "channel_config":
-                    messages.append(
-                        cc(
-                            args=args,
-                            item=item,
-                            channel_id=channel_id,
-                        )
+                    tool_response = cc(
+                        args=args,
+                        item=item,
+                        channel_id=channel_id,
                     )
                 elif repo_data is None or channel_config is None:
                     messages.append(
@@ -191,35 +215,41 @@ class PlanningHandler:
                         }
                     )
                 elif item.name == "search":
-                    messages.append(search(args, item, repo_data.local_path))
+                    tool_response = search(args, item, repo_data.local_path)
                 elif item.name == "list_files":
-                    messages.append(list_files(args, item, repo_data.local_path))
+                    tool_response = list_files(args, item, repo_data.local_path)
                 elif item.name == "read_file":
-                    messages.append(read_file(args, item, repo_data.local_path))
+                    tool_response = read_file(args, item, repo_data.local_path)
                 elif item.name == "checkout_branch":
-                    messages.append(checkout_branch(args, item, repo_data.repo))
+                    tool_response = checkout_branch(args, item, repo_data.repo)
                 elif item.name == "list_branches":
-                    messages.append(list_branches(args, item, repo_data.repo))
+                    tool_response = list_branches(args, item, repo_data.repo)
                 elif item.name == "web_search":
-                    messages.append(web_search(args, item))
+                    tool_response = web_search(args, item)
                 elif item.name == "visit_site":
-                    messages.append(visit_site(args, item))
+                    tool_response = visit_site(args, item)
                 elif item.name == "post_issue":
                     repo_url = self._create_repo_url(channel_config.repo_name)
-                    messages.append(post_issue(args, item, repo_url))
+                    tool_response = post_issue(args, item, repo_url)
                 else:
+                    save = False
                     logger.warning(
                         f"planning-agent received unknown tool call: {item.name}"
                     )
 
-            if answered:
-                break
+                if save:
+                    messages.append(tool_response)
+                    self._save_internal_tool_message(
+                        channel_id=channel_id,
+                        role="tool_output",
+                        call_id=item.call_id,
+                        tool_name=item.name,
+                        content=json.dumps(tool_response),
+                    )
 
-        send_slack_message(
-            channel_id=channel_id,
-            text=return_message,
-            token=workspace_config.access_token,
-        )
+            if not has_tool_calls:
+                # This should never happen - or odd if it does
+                break
 
     def _create_clone_url(self, repo_name: str) -> str:
         return prep_url(
@@ -275,8 +305,48 @@ class PlanningHandler:
             )
 
         db_messages = DBHandler.get_channel_messages(channel_id=channel_id)
-        historic_messages: Iterable[Any] = [
-            {"role": msg.role, "content": msg.body} for msg in db_messages
-        ]
+
+        historic_messages: Iterable[Any] = []
+        for msg in db_messages:
+            if msg.role == "user":
+                historic_messages.append({"role": "user", "content": msg.body})
+            elif msg.role == "assistant":
+                historic_messages.append({"role": "assistant", "content": msg.body})
+            elif msg.role == "tool_call":
+                historic_messages.append(
+                    {
+                        "type": "function_call",
+                        "call_id": msg.call_id,
+                        "name": msg.tool_name,
+                        "arguments": msg.body,
+                    }
+                )
+            elif msg.role == "tool_output":
+                historic_messages.append(
+                    {
+                        "type": "function_call_output",
+                        "call_id": msg.call_id,
+                        "output": msg.body,
+                    }
+                )
 
         return messages + historic_messages
+
+    def _save_internal_tool_message(
+        self,
+        channel_id: str,
+        role: Literal["tool_call", "tool_output"],
+        call_id: str,
+        tool_name: str,
+        content: str,
+    ) -> None:
+        message = ChannelMessage(
+            type=DBModelType.CHANNEL_MESSAGE,
+            channel_id=channel_id,
+            message_id=generate_ts(),
+            body=content,
+            role=role,
+            call_id=call_id,
+            tool_name=tool_name,
+        )
+        DBHandler.write_model(message)
