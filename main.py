@@ -102,15 +102,16 @@ async def git_webhook_handler(
         return JSONResponse(status_code=200, content={"status": "ok"})
 
     if message_type == WebhookMessageType.ISSUE_COMMENT:
-        await IssueCommentHandler().handle(typed_message)
+        # We need a quick return
+        asyncio.create_task(IssueCommentHandler().handle(typed_message))
         return JSONResponse(status_code=200, content={"status": "ok"})
 
     if message_type == WebhookMessageType.PR_COMMENT:
-        await PRCommentHandler().handle(typed_message)
+        asyncio.create_task(PRCommentHandler().handle(typed_message))
         return JSONResponse(status_code=200, content={"status": "ok"})
 
     if message_type == WebhookMessageType.PR_REVIEW:
-        await PRReviewHandler().handle(typed_message)
+        asyncio.create_task(PRReviewHandler().handle(typed_message))
         return JSONResponse(status_code=200, content={"status": "ok"})
 
     logger.warning(f"No handler for message type {message_type}")
