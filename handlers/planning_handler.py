@@ -43,7 +43,7 @@ class PlanningHandler:
         text = event.get("text")
         message_id = event.get("ts")
 
-        if text is not None and text.startswith("AGENT STATUS:"):
+        if text is not None and "AGENT STATUS:" in text:
             return
 
         channel_config = DBHandler.get_channel_config(channel_id=channel_id)
