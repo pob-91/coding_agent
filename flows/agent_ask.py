@@ -107,9 +107,8 @@ async def run_agent_ask(
             response = await asyncio.to_thread(
                 client.responses.create,
                 model=os.getenv(
-                    "AGENT_MODEL",
-                    "moonshotai/kimi-k2-thinking",
-                ),
+                    "PLANNING_MODEL", ""
+                ),  # Use the planning model as is probably better at reasoning
                 tools=ask_tools,
                 input=messages,
             )
@@ -132,7 +131,9 @@ async def run_agent_ask(
                             "type": "function_call_output",
                             "call_id": item.call_id,
                             "output": json.dumps(
-                                {"error": f"Invalid JSON arguments: {e}. Args must be JSON objects that adhere to the tool properties structure."}
+                                {
+                                    "error": f"Invalid JSON arguments: {e}. Args must be JSON objects that adhere to the tool properties structure."
+                                }
                             ),
                         }
                     )
