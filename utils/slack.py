@@ -25,6 +25,25 @@ def verify_slack_signature(body: bytes, signature: str, timestamp: str) -> bool:
     return hmac.compare_digest(my_signature, signature)
 
 
+def download_slack_file(url: str, token: str) -> bytes:
+    """
+    Download a file from Slack using the private download URL.
+
+    Args:
+        url: The url_private_download URL from the Slack file object
+        token: The workspace Slack access token
+
+    Returns:
+        The file contents as bytes
+    """
+    response = requests.get(
+        url,
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    response.raise_for_status()
+    return response.content
+
+
 def send_slack_message(
     channel_id: str,
     text: str,

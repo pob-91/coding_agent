@@ -24,7 +24,8 @@ from utils.logger import get_logger
 from utils.messages import convert_channel_messages
 from utils.prompt import build_planning_user_prompt
 from utils.repo import CheckoutResponse, clone_and_checkout, prep_url
-from utils.slack import send_slack_message
+from utils.slack import download_slack_file, send_slack_message
+from utils.transcribe import transcribe_audio
 
 logger = get_logger(__name__)
 
@@ -100,14 +101,60 @@ class PlanningHandler:
 
         logger.info(f"Processing event: {event}")
 
-        if text == "" and len(files) > 0:
+        audio_files = []
+        non_audio_files = []
+        if files:
+            for file_obj in files:
+                mimetype = file_obj.get("mimetype", "")
+                if mimetype.startswith("audio/"):
+                    audio_files.append(file_obj)
+                else:
+                    non_audio_files.append(file_obj)
+
+        transcription_parts = []
+        if audio_files:
+            for audio_file in audio_files:
+                download_url = audio_file.get("url_private_download")
+                filename = audio_file.get("name", "unknown")
+                mimetype = audio_file.get("mimetype", "")
+
+                if not download_url:
+                    logger.warning(f"Audio file {filename} has no download URL")
+                    continue
+
+                audio_bytes = download_slack_file(download_url, workspace_config.access_token)
+                transcription = transcribe_audio(audio_bytes, filename, mimetype)
+
+                if transcription:
+                    transcription_parts.append(transcription)
+                else:
+                    send_slack_message(
+                        channel_id=channel_id,
+                        text=f"Audio file detected and processed ({filename}), but transcription is not yet implemented. The stub transcription flow was executed.",
+                        token=workspace_config.access_token,
+                    )
+
+            if transcription_parts:
+                combined_transcription = "\n\n".join(transcription_parts)
+                channel_message = ChannelMessage(
+                    type=DBModelType.CHANNEL_MESSAGE,
+                    message_id=message_id,
+                    channel_id=channel_id,
+                    body=combined_transcription,
+                    role="user",
+                )
+                DBHandler.write_model(channel_message)
+                messages.append({"role": "user", "content": combined_transcription})
+
+        if non_audio_files:
             send_slack_message(
                 channel_id=channel_id,
-                text="We will be handling audio recordings shortly... Until then just toodle along little human.",
+                text="Non-audio file attachments are not yet supported.",
                 token=workspace_config.access_token,
             )
             return
-        elif len(text) > 0:
+
+        if text:
             channel_message = ChannelMessage(
                 type=DBModelType.CHANNEL_MESSAGE,
                 message_id=message_id,
@@ -117,7 +164,8 @@ class PlanningHandler:
             )
             DBHandler.write_model(channel_message)
             messages.append({"role": "user", "content": text})
-        else:
+
+        if not text and not audio_files:
             send_slack_message(
                 channel_id=channel_id,
                 text="Messages of that type cannot be handled yet. Sorry... Go back to burping and chewing little human.",
