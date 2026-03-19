@@ -12,6 +12,7 @@ class ChannelMessage(BaseDBModel):
     channel_id: str
     body: str
     role: Literal["user", "assistant", "tool_call", "tool_output"]
+    archived: bool = False
 
     # tools specific properties
     call_id: str | None = None

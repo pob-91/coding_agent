@@ -6,6 +6,7 @@ from typing import Any, Iterable, Literal
 from openai import OpenAI
 
 from data.db_handler import DBHandler
+from flows.run_planning_compaction import run_planning_compaction
 from model.base_db_model import DBModelType
 from model.channel_config import ChannelConfig
 from model.channel_message import ChannelMessage
@@ -20,6 +21,7 @@ from tools.tools import planning_tools
 from tools.visit_site import visit_site
 from tools.web_search import web_search
 from utils.logger import get_logger
+from utils.messages import convert_channel_messages
 from utils.prompt import build_planning_user_prompt
 from utils.repo import CheckoutResponse, clone_and_checkout, prep_url
 from utils.slack import send_slack_message
@@ -277,12 +279,30 @@ class PlanningHandler:
                     )
                 elif item.name == "post_issue":
                     repo_url = self._create_repo_url(channel_config.repo_name)
-                    tool_response = post_issue(args, item, repo_url)
+                    success, tool_response = post_issue(args, item, repo_url)
                     send_slack_message(
                         channel_id=channel_id,
                         text=f'_AGENT STATUS: currently posting issue "{args.get("title", "")}"_',
                         token=workspace_config.access_token,
                     )
+
+                    if success:
+                        # After we successfully post an issue, we assume that the conversation has reached a natural pause
+                        # So we produce a compacted message and archive old messages
+                        logger.info(
+                            "Successfully posted an issue so running compaction."
+                        )
+                        send_slack_message(
+                            channel_id=channel_id,
+                            text="_SYSTEM: Running compaction process please wait..._",
+                            token=workspace_config.access_token,
+                        )
+                        compacted = await run_planning_compaction(channel_id=channel_id)
+                        send_slack_message(
+                            channel_id=channel_id,
+                            text=f"_SYSTEM: Compacted channel.\n\n{compacted}",
+                            token=workspace_config.access_token,
+                        )
                 else:
                     save = False
                     logger.warning(
@@ -360,30 +380,7 @@ class PlanningHandler:
             )
 
         db_messages = DBHandler.get_channel_messages(channel_id=channel_id)
-
-        historic_messages: Iterable[Any] = []
-        for msg in db_messages:
-            if msg.role == "user":
-                historic_messages.append({"role": "user", "content": msg.body})
-            elif msg.role == "assistant":
-                historic_messages.append({"role": "assistant", "content": msg.body})
-            elif msg.role == "tool_call":
-                historic_messages.append(
-                    {
-                        "type": "function_call",
-                        "call_id": msg.call_id,
-                        "name": msg.tool_name,
-                        "arguments": msg.body,
-                    }
-                )
-            elif msg.role == "tool_output":
-                historic_messages.append(
-                    {
-                        "type": "function_call_output",
-                        "call_id": msg.call_id,
-                        "output": msg.body,
-                    }
-                )
+        historic_messages = convert_channel_messages(db_messages)
 
         return messages + historic_messages
 

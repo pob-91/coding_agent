@@ -2,7 +2,7 @@
   "_id": "_design/channel_messages",
   "views": {
     "by_channel": {
-      "map": "function(doc) { if (doc.type === 'CHANNEL_MESSAGE') { emit([doc.channel_id, doc.message_id], null); } }"
+      "map": "function(doc) { if (doc.type === 'CHANNEL_MESSAGE' && !doc.archived) { emit([doc.channel_id, doc.message_id], {\"_rev\": doc._rev}); } }"
     }
   }
 }

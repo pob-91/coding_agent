@@ -177,6 +177,45 @@ class DBHandler:
         if update_response.status_code not in (200, 201, 202):
             raise Exception(f"Failed to update message: {update_response.status_code}")
 
+    @staticmethod
+    def archive_channel_messages(channel_id: str) -> None:
+        base_url = f"{DBHandler._get_db_url()}/{os.getenv('DB_NAME')}"
+        get_url = f"{base_url}/_design/channel_messages/_view/by_channel"
+        get_response = requests.get(
+            url=get_url,
+            auth=DBHandler._get_db_auth(),
+            params={
+                "startkey": f'["{channel_id}", ""]',
+                "endkey": f'["{channel_id}", {{}}]',  # {} is "higher" than any string / number
+                "include_docs": "false",
+            },
+        )
+
+        if get_response.status_code != 200:
+            raise Exception(
+                f"Failed to get channel messages: {get_response.status_code} - {get_response.text}"
+            )
+
+        rows = get_response.json().get("rows", [])
+        if len(rows) == 0:
+            return
+
+        # Build bulk update payload
+        docs_to_update = [
+            {"_id": row["id"], "_rev": row["value"]["_rev"], "archived": True}
+            for row in rows
+        ]
+
+        # Bulk delete
+        bulk_response = requests.post(
+            url=f"{base_url}/_bulk_docs",
+            auth=DBHandler._get_db_auth(),
+            json={"docs": docs_to_update},
+        )
+
+        if bulk_response.status_code not in (200, 201, 202):
+            raise Exception(f"Failed to update message: {bulk_response.status_code}")
+
     # Private
     @staticmethod
     def _get_db_url() -> str:

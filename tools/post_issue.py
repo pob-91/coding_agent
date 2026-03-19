@@ -1,5 +1,5 @@
 import json
-from typing import Any
+from typing import Any, Tuple
 
 from utils.logger import get_logger
 from utils.repo import create_issue
@@ -7,7 +7,7 @@ from utils.repo import create_issue
 logger = get_logger(__name__)
 
 
-def post_issue(args: dict, item: Any, repo_url: str) -> dict:
+def post_issue(args: dict, item: Any, repo_url: str) -> Tuple[bool, dict]:
     missing_args: list[str] = []
     if "title" not in args:
         missing_args.append("title")
@@ -16,7 +16,7 @@ def post_issue(args: dict, item: Any, repo_url: str) -> dict:
 
     if len(missing_args) > 0:
         logger.warning(f"Missing args for post_issue: {missing_args}")
-        return {
+        return False, {
             "type": "function_call_output",
             "call_id": item.call_id,
             "output": json.dumps(
@@ -33,7 +33,7 @@ def post_issue(args: dict, item: Any, repo_url: str) -> dict:
             body=args["body"],
         )
         if not success:
-            return {
+            return False, {
                 "type": "function_call_output",
                 "call_id": item.call_id,
                 "output": json.dumps(
@@ -43,13 +43,13 @@ def post_issue(args: dict, item: Any, repo_url: str) -> dict:
                 ),
             }
 
-        return {
+        return True, {
             "type": "function_call_output",
             "call_id": item.call_id,
             "output": f"Issue {args['title']} created successfully.",
         }
     except Exception as e:
-        return {
+        return False, {
             "type": "function_call_output",
             "call_id": item.call_id,
             "output": json.dumps(
