@@ -65,13 +65,13 @@ class DBHandler:
     @staticmethod
     def get_channel_messages(channel_id: str) -> list[ChannelMessage]:
         url = f"{DBHandler._get_db_url()}/{os.getenv('DB_NAME')}/_design/channel_messages/_view/by_channel"
-        response = requests.get(
+        response = requests.post(
             url=url,
             auth=DBHandler._get_db_auth(),
-            params={
-                "startkey": f'["{channel_id}", ""]',
-                "endkey": f'["{channel_id}", {{}}]',  # {} is "higher" than any string / number
-                "include_docs": "true",
+            json={
+                "startkey": [channel_id, ""],
+                "endkey": [channel_id, {}],  # {} is "higher" than any string / number
+                "include_docs": True,
             },
         )
 
@@ -117,12 +117,12 @@ class DBHandler:
 
         # Query the view to get all related docs
         view_url = f"{base_url}/_design/channel_messages_by_trigger/_view/by_trigger"
-        response = requests.get(
+        response = requests.post(
             url=view_url,
             auth=DBHandler._get_db_auth(),
-            params={
-                "key": f'"{triggering_message_id}"',
-                "include_docs": "true",
+            json={
+                "key": triggering_message_id,
+                "include_docs": True,
             },
         )
 
@@ -181,13 +181,13 @@ class DBHandler:
     def archive_channel_messages(channel_id: str) -> None:
         base_url = f"{DBHandler._get_db_url()}/{os.getenv('DB_NAME')}"
         get_url = f"{base_url}/_design/channel_messages/_view/by_channel"
-        get_response = requests.get(
+        get_response = requests.post(
             url=get_url,
             auth=DBHandler._get_db_auth(),
-            params={
-                "startkey": f'["{channel_id}", ""]',
-                "endkey": f'["{channel_id}", {{}}]',  # {} is "higher" than any string / number
-                "include_docs": "false",
+            json={
+                "startkey": [channel_id, ""],
+                "endkey": [channel_id, {}],  # {} is "higher" than any string / number
+                "include_docs": True,
             },
         )
 
@@ -202,7 +202,10 @@ class DBHandler:
 
         # Build bulk update payload
         docs_to_update = [
-            {"_id": row["id"], "_rev": row["value"]["_rev"], "archived": True}
+            {
+                **row["doc"],
+                "archived": True,
+            }
             for row in rows
         ]
 
