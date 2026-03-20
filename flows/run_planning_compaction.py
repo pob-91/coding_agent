@@ -22,7 +22,7 @@ async def run_planning_compaction(channel_id: str) -> str:
     messages: Iterable[Any] = [{"role": "system", "content": system_prompt}]
 
     db_messages = DBHandler.get_channel_messages(channel_id=channel_id)
-    historic_messages = convert_channel_messages(db_messages)
+    historic_messages = convert_channel_messages(db_messages, flatten_tools=True)
 
     messages.extend(historic_messages)
 
@@ -33,7 +33,6 @@ async def run_planning_compaction(channel_id: str) -> str:
     response = await asyncio.to_thread(
         client.responses.create,
         model=os.getenv("PLANNING_MODEL", ""),
-        tools=[],
         input=messages,
     )
 

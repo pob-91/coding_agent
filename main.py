@@ -2,6 +2,7 @@ import asyncio
 import os
 from contextlib import asynccontextmanager
 
+import openai
 import requests
 import uvicorn
 from dotenv import load_dotenv
@@ -223,7 +224,13 @@ async def compaact_channel(
             status_code=400, content={"error": "require channel_id property"}
         )
 
-    result = await run_planning_compaction(channel_id=json["channel_id"])
+    try:
+        result = await run_planning_compaction(channel_id=json["channel_id"])
+    except openai.APIStatusError as e:
+        return JSONResponse(
+            status_code=e.status_code,
+            content={"error": e},
+        )
 
     return JSONResponse(
         status_code=200,
