@@ -45,7 +45,7 @@ class PlanningHandler:
         text = event.get("text")
         message_id = event.get("ts")
 
-        if text is not None and "AGENT STATUS:" in text:
+        if text is not None and ("AGENT STATUS:" in text or "SYSTEM STATUS:" in text):
             return
 
         channel_config = DBHandler.get_channel_config(channel_id=channel_id)
@@ -294,13 +294,13 @@ class PlanningHandler:
                         )
                         send_slack_message(
                             channel_id=channel_id,
-                            text="_SYSTEM: Running compaction process please wait..._",
+                            text="_SYSTEM STATUS: Running compaction process please wait..._",
                             token=workspace_config.access_token,
                         )
                         compacted = await run_planning_compaction(channel_id=channel_id)
                         send_slack_message(
                             channel_id=channel_id,
-                            text=f"_SYSTEM: Compacted channel.\n\n{compacted}",
+                            text=f"_SYSTEM STATUS: Compacted channel.\n\n{compacted}",
                             token=workspace_config.access_token,
                         )
                 else:

@@ -9,6 +9,7 @@ from fastapi import Depends, FastAPI, Header, HTTPException, Request
 from fastapi.responses import JSONResponse, RedirectResponse
 
 from data.db_handler import DBHandler
+from flows.run_planning_compaction import run_planning_compaction
 from handlers.issue_handler import IssueCommentHandler
 from handlers.planning_handler import PlanningHandler
 from handlers.pr_comment_handler import PRCommentHandler
@@ -208,6 +209,25 @@ async def create_workspace_config(
     return JSONResponse(
         status_code=201,
         content=config.model_dump(mode="json"),
+    )
+
+
+@app.post("/admin/compact_channel")
+async def compaact_channel(
+    request: Request,
+    _: bool = Depends(verify_admin_auth),
+):
+    json = await request.json()
+    if "channel_id" not in json:
+        return JSONResponse(
+            status_code=400, content={"error": "require channel_id property"}
+        )
+
+    result = await run_planning_compaction(channel_id=json["channel_id"])
+
+    return JSONResponse(
+        status_code=200,
+        content={"compacted_content": result},
     )
 
 
