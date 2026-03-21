@@ -17,7 +17,7 @@ RUN --mount=type=bind,source=pyproject.toml,target=pyproject.toml \
 FROM python:3.14-alpine AS runner
 
 RUN apk update --no-cache && apk upgrade --no-cache
-RUN apk add --no-cache git ripgrep
+RUN apk add --no-cache git ripgrep ffmpeg
 
 COPY --from=builder /app/.venv /app/.venv
 

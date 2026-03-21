@@ -10,6 +10,7 @@ from flows.run_planning_compaction import run_planning_compaction
 from model.base_db_model import DBModelType
 from model.channel_config import ChannelConfig
 from model.channel_message import ChannelMessage
+from model.file import AudioFile
 from tools.channel_config import channel_config as cc
 from tools.checkout_branch import checkout_branch
 from tools.list_branches import list_branches
@@ -46,11 +47,12 @@ class PlanningHandler:
         text = event.get("text")
         message_id = event.get("ts")
 
-        if text is not None and (
+        if text and (
             "AGENT STATUS:" in text
             or "SYSTEM STATUS:" in text
             or "SYSTEM MESSAGE:" in text
         ):
+            logger.info("System text not handling")
             return
 
         channel_config = DBHandler.get_channel_config(channel_id=channel_id)
@@ -73,6 +75,7 @@ class PlanningHandler:
         )
 
         if event.get("type") != "message":
+            logger.info("Event type is not message")
             return
         if event.get("user") == workspace_config.bot_user_id:
             # Don't amswer our own messages!
@@ -84,10 +87,16 @@ class PlanningHandler:
                 role="assistant",
             )
             DBHandler.write_model(channel_message)
+            logger.info("Message was from the bot so dont answer")
             return
         if event.get("subtype") is not None:
-            # New messages do not have this property
-            if event.get("subtype") == "message_deleted":
+            subtype = event.get("subtype", "")
+            if subtype not in {"message_deleted", "message_changed", "file_share"}:
+                logger.info(f"Event had suvtype: {subtype} not handling")
+                return
+
+            if subtype == "message_deleted":
+                logger.info("Handling deletion event")
                 id = event["previous_message"]["ts"]
                 DBHandler.delete_channel_message(
                     id
@@ -96,57 +105,54 @@ class PlanningHandler:
                     id
                 )  # This deletes all associated tool messages
                 return
-            if event.get("subtype") == "message_changed":
+            if subtype == "message_changed":
+                logger.info("Handling update event")
                 original_ts = payload["event"]["message"]["ts"]
                 new_content = payload["event"]["message"]["text"]
                 DBHandler.update_channel_message(original_ts, new_content)
                 return
-            return
+            if subtype == "file_share":
+                logger.info("Handling file share")
+                if len(files) != 1:
+                    send_slack_message(
+                        channel_id=channel_id,
+                        text="SYSTEM MESSAGE: Please send 1 file at a time little human... Toodle along now.",
+                        token=workspace_config.access_token,
+                    )
+                    return
+                file = download_slack_file(files[0], workspace_config.access_token)
+                if file is None or not isinstance(file, AudioFile):
+                    send_slack_message(
+                        channel_id=channel_id,
+                        text="SYSTEM MESSAGE: That file type is not currently supported. Go back to TikTok litte human. Consume...",
+                        token=workspace_config.access_token,
+                    )
+                    return
+                transcripton = transcribe_audio(file)
+                if transcripton is None:
+                    send_slack_message(
+                        channel_id=channel_id,
+                        text="SYSTEM MESSAGE: Something went wrong handling that file attachment. Either it was unsupported or the audio file failed to transcribe. Check docs for supported file types. Then bugger off.",
+                        token=workspace_config.access_token,
+                    )
+                    return
 
-        logger.info(f"Processing event: {event}")
-
-        if len(files) > 1:
-            send_slack_message(
-                channel_id=channel_id,
-                text="SYSTEM MESSAGE: Please send 1 file at a time little human... Toodle along now.",
-                token=workspace_config.access_token,
-            )
-            return
-        elif text and len(files) == 1:
-            send_slack_message(
-                channel_id=channel_id,
-                text="SYSTEM MESSAGE: Please send 1 thing at a time little human... Burp or emoji, not both. Toodle along now.",
-                token=workspace_config.access_token,
-            )
-            return
-        elif len(files) == 1:
-            logger.info("Handling file attachment.")
-            transcripton = self._handle_file_attachment(
-                files[0],
-                workspace_config.access_token,
-            )
-            if transcripton is None:
+                channel_message = ChannelMessage(
+                    type=DBModelType.CHANNEL_MESSAGE,
+                    message_id=message_id,
+                    channel_id=channel_id,
+                    body=transcripton,
+                    role="user",
+                )
+                DBHandler.write_model(channel_message)
+                messages.append({"role": "user", "content": transcripton})
                 send_slack_message(
                     channel_id=channel_id,
-                    text="SYSTEM MESSAGE: Something went wrong handling that file attachment. Either it was unsupported or the audio file failed to transcribe. Check docs for supported file types. Then bugger off.",
+                    text=f'SYSTEM MESSAGE: Processed transcription: "{transcripton}".',
                     token=workspace_config.access_token,
                 )
-                return
 
-            channel_message = ChannelMessage(
-                type=DBModelType.CHANNEL_MESSAGE,
-                message_id=message_id,
-                channel_id=channel_id,
-                body=transcripton,
-                role="user",
-            )
-            DBHandler.write_model(channel_message)
-            messages.append({"role": "user", "content": transcripton})
-            send_slack_message(
-                channel_id=channel_id,
-                text=f'SYSTEM MESSAGE: Processed transcription: "{transcripton}".',
-                token=workspace_config.access_token,
-            )
+        logger.info(f"Processing event: {event}")
 
         if text:
             channel_message = ChannelMessage(
@@ -447,25 +453,3 @@ class PlanningHandler:
             triggering_message_id=triggering_message_id,
         )
         DBHandler.write_model(message)
-
-    def _handle_file_attachment(self, file: Any, access_token: str) -> str | None:
-        mimetype = file.get("mimetype", "")
-
-        if mimetype not in {"audio/mp3", "audio/mpeg", "audio/wav"}:
-            logger.warning(f"File of type: {mimetype} sent. Not supported.")
-            return None
-
-        download_url = file.get("url_private_download")
-        filename = file.get("name", "unknown")
-
-        if not download_url:
-            logger.warning(f"Audio file {filename} has no download URL")
-            return None
-
-        audio_bytes = download_slack_file(download_url, access_token)
-        transcription = transcribe_audio(audio_bytes, mimetype)
-
-        if transcription is None:
-            return None
-
-        return transcription

@@ -24,7 +24,13 @@ async def run_planning_compaction(channel_id: str) -> str:
     db_messages = DBHandler.get_channel_messages(channel_id=channel_id)
     historic_messages = convert_channel_messages(db_messages, flatten_tools=True)
 
+    if len(historic_messages) == 0:
+        logger.info("Nothing to compact...")
+        return ""
+
     messages.extend(historic_messages)
+
+    logger.info(f"Running compaction process on {len(messages)} messages")
 
     client = OpenAI(
         base_url="https://openrouter.ai/api/v1",

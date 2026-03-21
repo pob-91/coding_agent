@@ -6,6 +6,11 @@ from typing import Any
 
 import requests
 
+from model.file import FILE_TYPE, AudioFile, BaseFile
+from utils.logger import get_logger
+
+logger = get_logger(__name__)
+
 
 def verify_slack_signature(body: bytes, signature: str, timestamp: str) -> bool:
     signing_secret = os.getenv("SLACK_SIGNING_SECRET", "")
@@ -25,23 +30,32 @@ def verify_slack_signature(body: bytes, signature: str, timestamp: str) -> bool:
     return hmac.compare_digest(my_signature, signature)
 
 
-def download_slack_file(url: str, token: str) -> bytes:
-    """
-    Download a file from Slack using the private download URL.
+def download_slack_file(file: Any, token: str) -> BaseFile | None:
+    # NOTE: This can handle other types of files but currently only audio supported
+    mimetype = file.get("mimetype", "")
+    mime = _mime_to_format(mimetype)
 
-    Args:
-        url: The url_private_download URL from the Slack file object
-        token: The workspace Slack access token
+    if mime is None:
+        logger.warning(f"File of type: {mimetype} sent. Not supported.")
+        return None
 
-    Returns:
-        The file contents as bytes
-    """
+    download_url = file.get("url_private_download")
+    filename = file.get("name", "unknown")
+
     response = requests.get(
-        url,
+        download_url,
         headers={"Authorization": f"Bearer {token}"},
     )
     response.raise_for_status()
-    return response.content
+
+    if not isinstance(response.content, bytes):
+        raise Exception("Download file content not bytes.")
+
+    return AudioFile(
+        type=mime,
+        data=response.content,
+        name=filename,
+    )
 
 
 def send_slack_message(
@@ -61,3 +75,17 @@ def send_slack_message(
         },
     )
     return response.json()
+
+
+# private
+
+
+def _mime_to_format(mime: str) -> FILE_TYPE | None:
+    if mime == "audio/mpeg" or mime == "audio/mp3":
+        return "mp3"
+    if mime == "audio/mp4" or mime == "audio/m4a":
+        return "mp4"
+    if mime == "audio/wav":
+        return "wav"
+
+    return None
