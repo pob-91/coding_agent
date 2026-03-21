@@ -24,7 +24,8 @@ from utils.logger import get_logger
 from utils.messages import convert_channel_messages
 from utils.prompt import build_planning_user_prompt
 from utils.repo import CheckoutResponse, clone_and_checkout, prep_url
-from utils.slack import send_slack_message
+from utils.slack import download_slack_file, send_slack_message
+from utils.transcribe import transcribe_audio
 
 logger = get_logger(__name__)
 
@@ -41,7 +42,7 @@ class PlanningHandler:
 
         event = payload.get("event", {})
         channel_id = event.get("channel")
-        files = event.get("files")
+        files = event.get("files", [])
         text = event.get("text")
         message_id = event.get("ts")
 
@@ -100,14 +101,45 @@ class PlanningHandler:
 
         logger.info(f"Processing event: {event}")
 
-        if text == "" and len(files) > 0:
+        if len(files) > 1:
             send_slack_message(
                 channel_id=channel_id,
-                text="We will be handling audio recordings shortly... Until then just toodle along little human.",
+                text="Please send 1 file at a time little human... Toodle along now.",
                 token=workspace_config.access_token,
             )
             return
-        elif len(text) > 0:
+        elif text and len(files) == 1:
+            send_slack_message(
+                channel_id=channel_id,
+                text="Please send 1 thing at a time little human... Burp or emoji, not both. Toodle along now.",
+                token=workspace_config.access_token,
+            )
+            return
+        elif len(files) == 1:
+            logger.info("Handling file attachment.")
+            transcripton = self._handle_file_attachment(
+                files[0],
+                workspace_config.access_token,
+            )
+            if transcripton is None:
+                send_slack_message(
+                    channel_id=channel_id,
+                    text="Something went wrong handling that file attachment. Either it was unsupported or the audio file failed to transcribe. Check docs for supported file types. Then bugger off.",
+                    token=workspace_config.access_token,
+                )
+                return
+
+            channel_message = ChannelMessage(
+                type=DBModelType.CHANNEL_MESSAGE,
+                message_id=message_id,
+                channel_id=channel_id,
+                body=transcripton,
+                role="user",
+            )
+            DBHandler.write_model(channel_message)
+            messages.append({"role": "user", "content": transcripton})
+
+        if text:
             channel_message = ChannelMessage(
                 type=DBModelType.CHANNEL_MESSAGE,
                 message_id=message_id,
@@ -117,7 +149,8 @@ class PlanningHandler:
             )
             DBHandler.write_model(channel_message)
             messages.append({"role": "user", "content": text})
-        else:
+
+        if not text and len(files) == 0:
             send_slack_message(
                 channel_id=channel_id,
                 text="Messages of that type cannot be handled yet. Sorry... Go back to burping and chewing little human.",
@@ -405,3 +438,23 @@ class PlanningHandler:
             triggering_message_id=triggering_message_id,
         )
         DBHandler.write_model(message)
+
+    def _handle_file_attachment(self, file: Any, access_token: str) -> str | None:
+        mimetype = file.get("mimetype", "")
+        if not mimetype.statswith("audio/"):
+            return None
+
+        download_url = file.get("url_private_download")
+        filename = file.get("name", "unknown")
+
+        if not download_url:
+            logger.warning(f"Audio file {filename} has no download URL")
+            return None
+
+        audio_bytes = download_slack_file(download_url, access_token)
+        transcription = transcribe_audio(audio_bytes, filename, mimetype)
+
+        if transcription is None:
+            return None
+
+        return transcription

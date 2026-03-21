@@ -49,6 +49,29 @@ The agent will:
 - Read information about the repository and the code context from the review comment
 - Gather context using tools about the files in the repository
 - Generate a code patch and commit it directly to the existing PR branch
+
+### Modalities
+
+This agent supports the following input modalities:
+
+#### Text
+
+Text messages are the primary input method. The agent processes text-based commands and questions through the various `/agent-*` commands documented above.
+
+#### Audio
+
+The agent can also process audio file attachments with the following constraints:
+
+- **Single file limit**: Only 1 audio file can be processed at a time. If multiple files are attached, the agent will request that files be sent one at a time.
+- **Allowed MIME types**: Any MIME type starting with `audio/` is accepted. Common examples include:
+  - `audio/mpeg` (MP3)
+  - `audio/wav` (WAV)
+  - `audio/mp4` (M4A)
+  - `audio/ogg` (OGG)
+  - `audio/webm` (WebM audio)
+- **Non-audio files**: Other file types (images, documents, etc.) are not currently supported.
+
+Audio files are transcribed and processed as text input alongside any accompanying message text.
 - Comment on the PR with a summary of the changes
 
 This is useful for requesting quick fixes or updates to a PR without creating a new branch.
