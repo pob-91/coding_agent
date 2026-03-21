@@ -1,4 +1,4 @@
-def transcribe_audio(audio_bytes: bytes, filename: str, mimetype: str) -> str:
+def transcribe_audio(audio_bytes: bytes, filename: str, mimetype: str) -> str | None:
     """
     Stub function for audio transcription.
 
