@@ -63,18 +63,13 @@ Text messages are the primary input method. The agent processes text-based comma
 The agent can also process audio file attachments with the following constraints:
 
 - **Single file limit**: Only 1 audio file can be processed at a time. If multiple files are attached, the agent will request that files be sent one at a time.
-- **Allowed MIME types**: Any MIME type starting with `audio/` is accepted. Common examples include:
+- **Allowed MIME types**: Currently only `mp3` or `wav` file types are supported.
   - `audio/mpeg` (MP3)
+  - `audio/mp3` (MP3)
   - `audio/wav` (WAV)
-  - `audio/mp4` (M4A)
-  - `audio/ogg` (OGG)
-  - `audio/webm` (WebM audio)
 - **Non-audio files**: Other file types (images, documents, etc.) are not currently supported.
 
 Audio files are transcribed and processed as text input alongside any accompanying message text.
-- Comment on the PR with a summary of the changes
-
-This is useful for requesting quick fixes or updates to a PR without creating a new branch.
 
 ### Slack Integration
 
@@ -104,14 +99,9 @@ CouchDB is the required database for this application. The following environment
 | `DB_PASSWORD` | The password for CouchDB authentication. | Yes |
 | `DB_NAME` | The name of the database to use within CouchDB. | Yes |
 
-### TODO
-
-- Streaming to slack (if possible)
-- UI updates to tell the user what the agent is doing
-- Audio support for recorded voice snippets
-
 ### Future Features
 
+- If you want to naturally chat with the agent then `openai/gpt-audio` is the way forward. However, it is verrrryy expensive.
 - Run tests function (will need a run_tests.sh file, or Makefile command) -> return is success or failure with a message
 - Run linting function (will need a run_lint.sh file, or Makefile command) -> return is success or failure with a message
 - If performance is not 100% then try the planner/coder model where 1 model (maybe a thinking one) plans the approach to the solution and another model (a coding specific one) calls the replace, insert and delete functions

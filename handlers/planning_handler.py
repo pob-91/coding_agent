@@ -46,7 +46,11 @@ class PlanningHandler:
         text = event.get("text")
         message_id = event.get("ts")
 
-        if text is not None and ("AGENT STATUS:" in text or "SYSTEM STATUS:" in text):
+        if text is not None and (
+            "AGENT STATUS:" in text
+            or "SYSTEM STATUS:" in text
+            or "SYSTEM MESSAGE:" in text
+        ):
             return
 
         channel_config = DBHandler.get_channel_config(channel_id=channel_id)
@@ -104,14 +108,14 @@ class PlanningHandler:
         if len(files) > 1:
             send_slack_message(
                 channel_id=channel_id,
-                text="Please send 1 file at a time little human... Toodle along now.",
+                text="SYSTEM MESSAGE: Please send 1 file at a time little human... Toodle along now.",
                 token=workspace_config.access_token,
             )
             return
         elif text and len(files) == 1:
             send_slack_message(
                 channel_id=channel_id,
-                text="Please send 1 thing at a time little human... Burp or emoji, not both. Toodle along now.",
+                text="SYSTEM MESSAGE: Please send 1 thing at a time little human... Burp or emoji, not both. Toodle along now.",
                 token=workspace_config.access_token,
             )
             return
@@ -124,7 +128,7 @@ class PlanningHandler:
             if transcripton is None:
                 send_slack_message(
                     channel_id=channel_id,
-                    text="Something went wrong handling that file attachment. Either it was unsupported or the audio file failed to transcribe. Check docs for supported file types. Then bugger off.",
+                    text="SYSTEM MESSAGE: Something went wrong handling that file attachment. Either it was unsupported or the audio file failed to transcribe. Check docs for supported file types. Then bugger off.",
                     token=workspace_config.access_token,
                 )
                 return
@@ -138,6 +142,11 @@ class PlanningHandler:
             )
             DBHandler.write_model(channel_message)
             messages.append({"role": "user", "content": transcripton})
+            send_slack_message(
+                channel_id=channel_id,
+                text=f'SYSTEM MESSAGE: Processed transcription: "{transcripton}".',
+                token=workspace_config.access_token,
+            )
 
         if text:
             channel_message = ChannelMessage(
@@ -153,7 +162,7 @@ class PlanningHandler:
         if not text and len(files) == 0:
             send_slack_message(
                 channel_id=channel_id,
-                text="Messages of that type cannot be handled yet. Sorry... Go back to burping and chewing little human.",
+                text="SYSTEM MESSAGE: Messages of that type cannot be handled yet. Sorry... Go back to burping and chewing little human.",
                 token=workspace_config.access_token,
             )
             return
@@ -441,7 +450,9 @@ class PlanningHandler:
 
     def _handle_file_attachment(self, file: Any, access_token: str) -> str | None:
         mimetype = file.get("mimetype", "")
-        if not mimetype.statswith("audio/"):
+
+        if mimetype not in {"audio/mp3", "audio/mpeg", "audio/wav"}:
+            logger.warning(f"File of type: {mimetype} sent. Not supported.")
             return None
 
         download_url = file.get("url_private_download")
@@ -452,7 +463,7 @@ class PlanningHandler:
             return None
 
         audio_bytes = download_slack_file(download_url, access_token)
-        transcription = transcribe_audio(audio_bytes, filename, mimetype)
+        transcription = transcribe_audio(audio_bytes, mimetype)
 
         if transcription is None:
             return None
