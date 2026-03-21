@@ -111,6 +111,22 @@ class PlanningHandler:
                 else:
                     non_audio_files.append(file_obj)
 
+        if files and len(files) > 1:
+            send_slack_message(
+                channel_id=channel_id,
+                text="Please send 1 file at a time little human...",
+                token=workspace_config.access_token,
+            )
+            return
+
+        if non_audio_files:
+            send_slack_message(
+                channel_id=channel_id,
+                text="Non-audio file attachments are not yet supported. Burp and chew little human...",
+                token=workspace_config.access_token,
+            )
+            return
+
         transcription_parts = []
         if audio_files:
             for audio_file in audio_files:
@@ -146,13 +162,7 @@ class PlanningHandler:
                 DBHandler.write_model(channel_message)
                 messages.append({"role": "user", "content": combined_transcription})
 
-        if non_audio_files:
-            send_slack_message(
-                channel_id=channel_id,
-                text="Non-audio file attachments are not yet supported.",
-                token=workspace_config.access_token,
-            )
-            return
+        
 
         if text:
             channel_message = ChannelMessage(
