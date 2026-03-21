@@ -56,7 +56,7 @@ async def run_planning_compaction(channel_id: str) -> str:
     # Write the compacted message
     compacted_message = ChannelMessage(
         type=DBModelType.CHANNEL_MESSAGE,
-        message_id=db_messages[-1].message_id,
+        message_id=f"{db_messages[-1].message_id}_compacted",
         channel_id=channel_id,
         body=compacted,
         role="assistant",
