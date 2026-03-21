@@ -2,6 +2,7 @@ import asyncio
 import os
 from contextlib import asynccontextmanager
 
+import openai
 import requests
 import uvicorn
 from dotenv import load_dotenv
@@ -9,6 +10,7 @@ from fastapi import Depends, FastAPI, Header, HTTPException, Request
 from fastapi.responses import JSONResponse, RedirectResponse
 
 from data.db_handler import DBHandler
+from flows.run_planning_compaction import run_planning_compaction
 from handlers.issue_handler import IssueCommentHandler
 from handlers.planning_handler import PlanningHandler
 from handlers.pr_comment_handler import PRCommentHandler
@@ -208,6 +210,31 @@ async def create_workspace_config(
     return JSONResponse(
         status_code=201,
         content=config.model_dump(mode="json"),
+    )
+
+
+@app.post("/admin/compact_channel")
+async def compaact_channel(
+    request: Request,
+    _: bool = Depends(verify_admin_auth),
+):
+    json = await request.json()
+    if "channel_id" not in json:
+        return JSONResponse(
+            status_code=400, content={"error": "require channel_id property"}
+        )
+
+    try:
+        result = await run_planning_compaction(channel_id=json["channel_id"])
+    except openai.APIStatusError as e:
+        return JSONResponse(
+            status_code=e.status_code,
+            content={"error": e},
+        )
+
+    return JSONResponse(
+        status_code=200,
+        content={"compacted_content": result},
     )
 
 
