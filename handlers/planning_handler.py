@@ -6,6 +6,7 @@ from typing import Any, Iterable, Literal
 from openai import OpenAI
 
 from data.db_handler import DBHandler
+from data.open_router import OpenRouterHandler
 from flows.run_planning_compaction import run_planning_compaction
 from model.base_db_model import DBModelType
 from model.channel_config import ChannelConfig
@@ -16,6 +17,7 @@ from tools.checkout_branch import checkout_branch
 from tools.compact import compact_chat
 from tools.list_branches import list_branches
 from tools.list_files import list_files
+from tools.model_config import get_configured_model
 from tools.post_issue import post_issue
 from tools.read_file import read_file
 from tools.search import search
@@ -184,7 +186,9 @@ class PlanningHandler:
         while True:
             response = await asyncio.to_thread(
                 client.responses.create,
-                model=os.getenv("PLANNING_MODEL", ""),
+                model=OpenRouterHandler.get_planning_model(
+                    configured_model=workspace_config.planning_model,
+                ),
                 tools=planning_tools,
                 input=messages,
             )
@@ -332,13 +336,28 @@ class PlanningHandler:
                         text=f"_AGENT STATUS: compacting {len(messages) - 3} chat messages..._",
                         token=workspace_config.access_token,
                     )
-                    tool_response = compact_chat(item, channel_id=channel_id)
+                    tool_response = compact_chat(
+                        item,
+                        channel_id=channel_id,
+                        configured_model=workspace_config.planning_model,
+                    )
                     send_slack_message(
                         channel_id=channel_id,
                         text="_AGENT STATUS: Completed._",
                         token=workspace_config.access_token,
                     )
                     save = False
+                elif item.name == "get_configured_model":
+                    send_slack_message(
+                        channel_id=channel_id,
+                        text=f"_AGENT STATUS: getting model type {args.get('model_type')}_",
+                        token=workspace_config.access_token,
+                    )
+                    tool_response = get_configured_model(
+                        args,
+                        item,
+                        workspace_config=workspace_config,
+                    )
                 elif item.name == "post_issue":
                     repo_url = self._create_repo_url(channel_config.repo_name)
                     send_slack_message(
@@ -363,7 +382,10 @@ class PlanningHandler:
                             text="_SYSTEM STATUS: Running compaction process please wait..._",
                             token=workspace_config.access_token,
                         )
-                        compacted = await run_planning_compaction(channel_id=channel_id)
+                        compacted = await run_planning_compaction(
+                            channel_id=channel_id,
+                            configured_model=workspace_config.planning_model,
+                        )
                         send_slack_message(
                             channel_id=channel_id,
                             text=f"_SYSTEM STATUS: Compacted channel.\n\n{compacted}",

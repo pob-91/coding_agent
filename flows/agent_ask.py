@@ -6,6 +6,7 @@ from typing import Any, Iterable
 
 from openai import OpenAI
 
+from data.open_router import OpenRouterHandler
 from model.pull_review_comment import PullReviewComment
 from model.repository import Repository
 from tools.list_files import list_files
@@ -106,8 +107,8 @@ async def run_agent_ask(
 
             response = await asyncio.to_thread(
                 client.responses.create,
-                model=os.getenv(
-                    "PLANNING_MODEL", ""
+                model=OpenRouterHandler.get_planning_model(
+                    configured_model=None,
                 ),  # Use the planning model as is probably better at reasoning
                 tools=ask_tools,
                 input=messages,

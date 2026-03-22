@@ -10,6 +10,9 @@ Available Tools
 
 Configuration:
 - channel_config: Set the repository associated with this channel
+- get_configured_model: Get the currently configred model for a specific type of job. E.g. z-ai/glm-5 for coding.
+- list_available_models: List all available models for a specific type of job. Use this to work out which model can be used to update the config.
+- configure_model: Updates the config to tell the system which model to use for which type of job. E.g. z-ai/glm-5 for coding. If the user asks to configure a model you should always read list_available_models and prompt the user to choose from the selection before proceeding.
 
 Context gathering:
 - list_files: List files and directories at a given path
@@ -26,6 +29,9 @@ Git operations:
 
 Task creation:
 - post_issue: Create an issue that triggers the coding agent to implement changes
+
+Other:
+- compact_chat: Compacts the current chat so that memory and storage is cleaned up.
 
 Workflow
 

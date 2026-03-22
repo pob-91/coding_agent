@@ -397,4 +397,56 @@ planning_tools: Iterable[Any] = [
             "additionalProperties": False,
         },
     },
+    {
+        "type": "function",
+        "name": "get_configured_model",
+        "description": "Get the currently configured model for a given agentic task.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "model_type": {
+                    "type": "string",
+                    "description": "The type of agentic task. This MUST be one of: planning, coding or audio.",
+                },
+            },
+            "required": ["model_type"],
+            "additionalProperties": False,
+        },
+    },
+    {
+        "type": "function",
+        "name": "list_available_models",
+        "description": "List all available models for a given agentic task.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "model_type": {
+                    "type": "string",
+                    "description": "The type of agentic task. This MUST be one of: planning, coding or audio.",
+                },
+            },
+            "required": ["model_type"],
+            "additionalProperties": False,
+        },
+    },
+    {
+        "type": "function",
+        "name": "configure_model",
+        "description": "Update the model config to specify which model should be used for a given agentic task.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "model_type": {
+                    "type": "string",
+                    "description": "The type of agentic task. This MUST be one of: planning, coding or audio.",
+                },
+                "model_name": {
+                    "type": "string",
+                    "description": "The model to use for the specified task. This should be one of the models from the list_available_models tool.",
+                },
+            },
+            "required": ["model_type"],
+            "additionalProperties": False,
+        },
+    },
 ]

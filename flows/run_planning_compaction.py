@@ -5,6 +5,7 @@ from typing import Any, Iterable
 from openai import OpenAI
 
 from data.db_handler import DBHandler
+from data.open_router import OpenRouterHandler
 from model.base_db_model import DBModelType
 from model.channel_message import ChannelMessage
 from utils.logger import get_logger
@@ -13,7 +14,10 @@ from utils.messages import convert_channel_messages
 logger = get_logger(__name__)
 
 
-async def run_planning_compaction(channel_id: str) -> str:
+async def run_planning_compaction(
+    channel_id: str,
+    configured_model: str | None = None,
+) -> str:
     # Once an issue is posted we are going to compact all messages in the related channel
 
     with open("./agent_compact_system_prompt.txt", "r") as f:
@@ -44,7 +48,7 @@ async def run_planning_compaction(channel_id: str) -> str:
     )
     response = await asyncio.to_thread(
         client.chat.completions.create,
-        model=os.getenv("PLANNING_MODEL", ""),
+        model=OpenRouterHandler.get_planning_model(configured_model=configured_model),
         messages=messages,
     )
 

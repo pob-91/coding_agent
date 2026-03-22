@@ -7,6 +7,7 @@ from typing import Any, Iterable, Literal
 
 from openai import OpenAI
 
+from data.open_router import OpenRouterHandler
 from model.issue import Issue
 from model.pull_review_comment import PullReviewComment
 from model.repository import Repository
@@ -146,7 +147,7 @@ async def run_agent_implement(
 
         response = await asyncio.to_thread(
             client.responses.create,
-            model=os.getenv("AGENT_MODEL", "moonshotai/kimi-k2-thinking"),
+            model=OpenRouterHandler.get_agent_model(),
             tools=issue_tools,
             input=messages,
         )

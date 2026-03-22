@@ -4,6 +4,7 @@ import subprocess
 
 from openai import OpenAI
 
+from data.open_router import OpenRouterHandler
 from model.file import AudioFile
 
 
@@ -42,7 +43,7 @@ def transcribe_audio(file: AudioFile) -> str | None:
                 ],
             }
         ],
-        model=os.getenv("AUDIO_MODEL", ""),
+        model=OpenRouterHandler.get_audio_model(),
     )
 
     return completion.choices[0].message.content

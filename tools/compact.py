@@ -8,9 +8,18 @@ from utils.logger import get_logger
 logger = get_logger(__name__)
 
 
-def compact_chat(item: Any, channel_id: str) -> dict:
+def compact_chat(
+    item: Any,
+    channel_id: str,
+    configured_model: str | None = None,
+) -> dict:
     try:
-        asyncio.run(run_planning_compaction(channel_id=channel_id))
+        asyncio.run(
+            run_planning_compaction(
+                channel_id=channel_id,
+                configured_model=configured_model,
+            )
+        )
         return {
             "type": "function_call_output",
             "call_id": item.call_id,
