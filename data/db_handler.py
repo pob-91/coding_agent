@@ -8,6 +8,9 @@ from model.base_db_model import BaseDBModel
 from model.channel_config import ChannelConfig
 from model.channel_message import ChannelMessage
 from model.workspace_config import WorkspaceConfig
+from utils.logger import get_logger
+
+logger = get_logger(__name__)
 
 
 class DBHandler:
@@ -209,7 +212,7 @@ class DBHandler:
             for row in rows
         ]
 
-        # Bulk delete
+        # Bulk update
         bulk_response = requests.post(
             url=f"{base_url}/_bulk_docs",
             auth=DBHandler._get_db_auth(),

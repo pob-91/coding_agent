@@ -29,6 +29,12 @@ async def run_planning_compaction(channel_id: str) -> str:
         return ""
 
     messages.extend(historic_messages)
+    messages.append(
+        {
+            "role": "user",
+            "content": "Now produce the compacted summary of the above conversation.",
+        }
+    )
 
     logger.info(f"Running compaction process on {len(messages)} messages")
 
@@ -37,24 +43,16 @@ async def run_planning_compaction(channel_id: str) -> str:
         api_key=os.getenv("OPEN_ROUTER_API_KEY"),
     )
     response = await asyncio.to_thread(
-        client.responses.create,
+        client.chat.completions.create,
         model=os.getenv("PLANNING_MODEL", ""),
-        input=messages,
+        messages=messages,
     )
 
-    compacted = ""
+    compacted = response.choices[0].message.content or ""
 
-    for item in response.output:
-        if item.type != "message":
-            logger.warning(
-                f"Got item {item.type} in compaction response. Not handling."
-            )
-            continue
-
-        for msg in item.content:
-            if msg.type != "output_text":
-                continue
-            compacted += msg.text
+    if not compacted:
+        logger.error("Failed to compact, got empty content.")
+        return compacted
 
     # Archive the current channel messages which takes them out of the view
     DBHandler.archive_channel_messages(channel_id)
