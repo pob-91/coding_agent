@@ -348,7 +348,11 @@ class PlanningHandler:
                         token=workspace_config.access_token,
                     )
 
-                    if success:
+                    if (
+                        success
+                        and os.getenv("COMPACT_ON_POST", "false").lower().strip()
+                        == "true"
+                    ):
                         # After we successfully post an issue, we assume that the conversation has reached a natural pause
                         # So we produce a compacted message and archive old messages
                         logger.info(
