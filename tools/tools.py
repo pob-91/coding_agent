@@ -40,7 +40,7 @@ issue_tools: Iterable[Any] = [
     {
         "type": "function",
         "name": "read_file",
-        "description": "Read a portion of a file.",
+        "description": "Read a portion of a file. By default this will read the 1st 50 lines unless different properties are sent for start_line and end_line.",
         "parameters": {
             "type": "object",
             "properties": {
@@ -204,7 +204,7 @@ ask_tools: Iterable[Any] = [
     {
         "type": "function",
         "name": "read_file",
-        "description": "Read a portion of a file.",
+        "description": "Read a portion of a file. By default this will read the 1st 50 lines unless different properties are sent for start_line and end_line.",
         "parameters": {
             "type": "object",
             "properties": {
@@ -296,7 +296,7 @@ planning_tools: Iterable[Any] = [
     {
         "type": "function",
         "name": "read_file",
-        "description": "Read a portion of a file.",
+        "description": "Read a portion of a file. By default this will read the 1st 50 lines unless different properties are sent for start_line and end_line.",
         "parameters": {
             "type": "object",
             "properties": {
