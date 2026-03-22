@@ -373,6 +373,12 @@ planning_tools: Iterable[Any] = [
     },
     {
         "type": "function",
+        "name": "compact_chat",
+        "description": "Compact the chat history to save space and memory.",
+        "parameters": {},
+    },
+    {
+        "type": "function",
         "name": "post_issue",
         "description": "Post an issue that triggers the coding agent to implement the described change.",
         "parameters": {

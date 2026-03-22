@@ -13,6 +13,7 @@ from model.channel_message import ChannelMessage
 from model.file import AudioFile
 from tools.channel_config import channel_config as cc
 from tools.checkout_branch import checkout_branch
+from tools.compact import compact_chat
 from tools.list_branches import list_branches
 from tools.list_files import list_files
 from tools.post_issue import post_issue
@@ -325,6 +326,19 @@ class PlanningHandler:
                         text=f"_AGENT STATUS: currently visiting site {args.get('url', '')}_",
                         token=workspace_config.access_token,
                     )
+                elif item.name == "compat_chat":
+                    send_slack_message(
+                        channel_id=channel_id,
+                        text=f"_AGENT STATUS: compacting {len(messages) - 3} chat messages..._",
+                        token=workspace_config.access_token,
+                    )
+                    tool_response = compact_chat(item, channel_id=channel_id)
+                    send_slack_message(
+                        channel_id=channel_id,
+                        text="_AGENT STATUS: Completed._",
+                        token=workspace_config.access_token,
+                    )
+                    save = False
                 elif item.name == "post_issue":
                     repo_url = self._create_repo_url(channel_config.repo_name)
                     success, tool_response = post_issue(args, item, repo_url)
