@@ -259,15 +259,15 @@ class PlanningHandler:
                 save = True
 
                 if item.name == "channel_config":
-                    tool_response = cc(
-                        args=args,
-                        item=item,
-                        channel_id=channel_id,
-                    )
                     send_slack_message(
                         channel_id=channel_id,
                         text=f"_AGENT STATUS: currently configuring channel with {args.get('repo_name', 'unknown')}_",
                         token=workspace_config.access_token,
+                    )
+                    tool_response = cc(
+                        args=args,
+                        item=item,
+                        channel_id=channel_id,
                     )
                 elif repo_data is None or channel_config is None:
                     messages.append(
@@ -278,54 +278,54 @@ class PlanningHandler:
                         }
                     )
                 elif item.name == "search":
-                    tool_response = search(args, item, repo_data.local_path)
                     send_slack_message(
                         channel_id=channel_id,
                         text=f'_AGENT STATUS: currently searching repository for "{args.get("query", "")}"_',
                         token=workspace_config.access_token,
                     )
+                    tool_response = search(args, item, repo_data.local_path)
                 elif item.name == "list_files":
-                    tool_response = list_files(args, item, repo_data.local_path)
                     send_slack_message(
                         channel_id=channel_id,
                         text=f"_AGENT STATUS: currently listing files in {args.get('path', '')}_",
                         token=workspace_config.access_token,
                     )
+                    tool_response = list_files(args, item, repo_data.local_path)
                 elif item.name == "read_file":
-                    tool_response = read_file(args, item, repo_data.local_path)
                     send_slack_message(
                         channel_id=channel_id,
                         text=f"_AGENT STATUS: currently reading file {args.get('path', '')}_",
                         token=workspace_config.access_token,
                     )
+                    tool_response = read_file(args, item, repo_data.local_path)
                 elif item.name == "checkout_branch":
-                    tool_response = checkout_branch(args, item, repo_data.repo)
                     send_slack_message(
                         channel_id=channel_id,
                         text=f"_AGENT STATUS: currently checking out branch {args.get('branch_name', '')}_",
                         token=workspace_config.access_token,
                     )
+                    tool_response = checkout_branch(args, item, repo_data.repo)
                 elif item.name == "list_branches":
-                    tool_response = list_branches(args, item, repo_data.repo)
                     send_slack_message(
                         channel_id=channel_id,
                         text="_AGENT STATUS: currently listing branches_",
                         token=workspace_config.access_token,
                     )
+                    tool_response = list_branches(args, item, repo_data.repo)
                 elif item.name == "web_search":
-                    tool_response = web_search(args, item)
                     send_slack_message(
                         channel_id=channel_id,
                         text=f'_AGENT STATUS: currently performing web search for "{args.get("phrase", "")}"_',
                         token=workspace_config.access_token,
                     )
+                    tool_response = web_search(args, item)
                 elif item.name == "visit_site":
-                    tool_response = visit_site(args, item)
                     send_slack_message(
                         channel_id=channel_id,
                         text=f"_AGENT STATUS: currently visiting site {args.get('url', '')}_",
                         token=workspace_config.access_token,
                     )
+                    tool_response = visit_site(args, item)
                 elif item.name == "compat_chat":
                     send_slack_message(
                         channel_id=channel_id,
@@ -341,12 +341,12 @@ class PlanningHandler:
                     save = False
                 elif item.name == "post_issue":
                     repo_url = self._create_repo_url(channel_config.repo_name)
-                    success, tool_response = post_issue(args, item, repo_url)
                     send_slack_message(
                         channel_id=channel_id,
                         text=f'_AGENT STATUS: currently posting issue "{args.get("title", "")}"_',
                         token=workspace_config.access_token,
                     )
+                    success, tool_response = post_issue(args, item, repo_url)
 
                     if (
                         success
