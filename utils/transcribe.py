@@ -8,7 +8,10 @@ from data.open_router import OpenRouterHandler
 from model.file import AudioFile
 
 
-def transcribe_audio(file: AudioFile) -> str | None:
+def transcribe_audio(
+    file: AudioFile,
+    configured_model: str | None = None,
+) -> str | None:
     type = "wav"
 
     # The model only supports wav and mp3
@@ -43,7 +46,7 @@ def transcribe_audio(file: AudioFile) -> str | None:
                 ],
             }
         ],
-        model=OpenRouterHandler.get_audio_model(),
+        model=OpenRouterHandler.get_audio_model(configured_model=configured_model),
     )
 
     return completion.choices[0].message.content

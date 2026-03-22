@@ -17,7 +17,11 @@ from tools.checkout_branch import checkout_branch
 from tools.compact import compact_chat
 from tools.list_branches import list_branches
 from tools.list_files import list_files
-from tools.model_config import get_configured_model
+from tools.model_config import (
+    configure_model,
+    get_configured_model,
+    list_available_models,
+)
 from tools.post_issue import post_issue
 from tools.read_file import read_file
 from tools.search import search
@@ -131,7 +135,10 @@ class PlanningHandler:
                         token=workspace_config.access_token,
                     )
                     return
-                transcripton = transcribe_audio(file)
+                transcripton = transcribe_audio(
+                    file,
+                    configured_model=workspace_config.audio_model,
+                )
                 if transcripton is None:
                     send_slack_message(
                         channel_id=channel_id,
@@ -354,6 +361,27 @@ class PlanningHandler:
                         token=workspace_config.access_token,
                     )
                     tool_response = get_configured_model(
+                        args,
+                        item,
+                        workspace_config=workspace_config,
+                    )
+                elif item.name == "list_available_models":
+                    send_slack_message(
+                        channel_id=channel_id,
+                        text=f"_AGENT STATUS: listing available models for {args.get('model_type')}_",
+                        token=workspace_config.access_token,
+                    )
+                    tool_response = list_available_models(
+                        args,
+                        item,
+                    )
+                elif item.name == "configure_model":
+                    send_slack_message(
+                        channel_id=channel_id,
+                        text=f"_AGENT STATUS: setting {args.get('model_name')} for {args.get('model_type')}_",
+                        token=workspace_config.access_token,
+                    )
+                    tool_response = configure_model(
                         args,
                         item,
                         workspace_config=workspace_config,
