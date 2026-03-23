@@ -174,7 +174,7 @@ def configure_model(
         config.audio_model = args["model_name"]
 
     try:
-        DBHandler.write_model(config)
+        DBHandler.update_model(config)
     except Exception as e:
         return {
             "type": "function_call_output",

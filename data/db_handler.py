@@ -32,6 +32,17 @@ class DBHandler:
         return DBHandler._write_generic_model(model)
 
     @staticmethod
+    def update_model(model: BaseDBModel) -> None:
+        if isinstance(model, WorkspaceConfig):
+            return DBHandler._update_workspace_config(model)
+        if isinstance(model, ChannelConfig):
+            return DBHandler._update_channel_config(model)
+        if isinstance(model, ChannelMessage):
+            return DBHandler._update_channel_message(model)
+
+        return DBHandler._update_generic_model(model)
+
+    @staticmethod
     def get_workspace_config(team_id: str) -> WorkspaceConfig | None:
         url = f"{DBHandler._get_db_url()}/{os.getenv('DB_NAME')}/{team_id}"
         response = requests.get(
@@ -347,4 +358,128 @@ class DBHandler:
         if response.status_code not in (201, 202):
             raise Exception(
                 f"Failed to create model: {response.status_code} - {response.text}"
+            )
+
+    @staticmethod
+    def _update_workspace_config(config: WorkspaceConfig) -> None:
+        base_url = f"{DBHandler._get_db_url()}/{os.getenv('DB_NAME')}"
+
+        get_response = requests.get(
+            url=f"{base_url}/{config.team_id}",
+            auth=DBHandler._get_db_auth(),
+        )
+
+        if get_response.status_code == 404:
+            return DBHandler._write_workspace_config(config)
+        if get_response.status_code != 200:
+            raise Exception(
+                f"Failed to get workspace config: {get_response.status_code}"
+            )
+
+        existing_doc = get_response.json()
+        merged_doc = {**existing_doc, **config.model_dump(mode="json")}
+
+        update_response = requests.put(
+            url=f"{base_url}/{config.team_id}",
+            auth=DBHandler._get_db_auth(),
+            json=merged_doc,
+        )
+
+        if update_response.status_code not in (200, 201, 202):
+            raise Exception(
+                f"Failed to update workspace config: {update_response.status_code}"
+            )
+
+    @staticmethod
+    def _update_channel_config(config: ChannelConfig) -> None:
+        base_url = f"{DBHandler._get_db_url()}/{os.getenv('DB_NAME')}"
+
+        get_response = requests.get(
+            url=f"{base_url}/{config.channel_id}",
+            auth=DBHandler._get_db_auth(),
+        )
+
+        if get_response.status_code == 404:
+            return DBHandler._write_channel_config(config)
+        if get_response.status_code != 200:
+            raise Exception(
+                f"Failed to get channel config: {get_response.status_code}"
+            )
+
+        existing_doc = get_response.json()
+        merged_doc = {**existing_doc, **config.model_dump(mode="json")}
+
+        update_response = requests.put(
+            url=f"{base_url}/{config.channel_id}",
+            auth=DBHandler._get_db_auth(),
+            json=merged_doc,
+        )
+
+        if update_response.status_code not in (200, 201, 202):
+            raise Exception(
+                f"Failed to update channel config: {update_response.status_code}"
+            )
+
+    @staticmethod
+    def _update_channel_message(message: ChannelMessage) -> None:
+        base_url = f"{DBHandler._get_db_url()}/{os.getenv('DB_NAME')}"
+
+        get_response = requests.get(
+            url=f"{base_url}/{message.message_id}",
+            auth=DBHandler._get_db_auth(),
+        )
+
+        if get_response.status_code == 404:
+            return DBHandler._write_channel_message(message)
+        if get_response.status_code != 200:
+            raise Exception(
+                f"Failed to get channel message: {get_response.status_code}"
+            )
+
+        existing_doc = get_response.json()
+        merged_doc = {**existing_doc, **message.model_dump(mode="json")}
+
+        update_response = requests.put(
+            url=f"{base_url}/{message.message_id}",
+            auth=DBHandler._get_db_auth(),
+            json=merged_doc,
+        )
+
+        if update_response.status_code not in (200, 201, 202):
+            raise Exception(
+                f"Failed to update channel message: {update_response.status_code}"
+            )
+
+    @staticmethod
+    def _update_generic_model(model: BaseDBModel) -> None:
+        base_url = f"{DBHandler._get_db_url()}/{os.getenv('DB_NAME')}"
+        model_id = model.model_dump(mode="json").get("_id")
+
+        if not model_id:
+            raise Exception("Cannot update model without _id")
+
+        get_response = requests.get(
+            url=f"{base_url}/{model_id}",
+            auth=DBHandler._get_db_auth(),
+        )
+
+        if get_response.status_code == 404:
+            return DBHandler._write_generic_model(model)
+        if get_response.status_code != 200:
+            raise Exception(
+                f"Failed to get model: {get_response.status_code}"
+            )
+
+        existing_doc = get_response.json()
+        merged_doc = {**existing_doc, **model.model_dump(mode="json")}
+
+        update_response = requests.put(
+            url=f"{base_url}/{model_id}",
+            auth=DBHandler._get_db_auth(),
+            json=merged_doc,
+        )
+
+        if update_response.status_code not in (200, 201, 202):
+            raise Exception(
+                f"Failed to update model: {update_response.status_code}"
             )
