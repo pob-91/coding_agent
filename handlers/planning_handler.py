@@ -14,7 +14,6 @@ from model.channel_message import ChannelMessage
 from model.file import AudioFile
 from tools.channel_config import channel_config as cc
 from tools.checkout_branch import checkout_branch
-from tools.compact import compact_chat
 from tools.list_branches import list_branches
 from tools.list_files import list_files
 from tools.model_config import (
