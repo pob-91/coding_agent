@@ -82,8 +82,9 @@ async def root():
     }
 
 
-@app.post("/gitea/events")
+@app.post("/{workspace_id}/gitea/events")
 async def git_webhook_handler(
+    workspace_id: str,
     request: Request,
     _: bool = Depends(verify_webhook_auth),
 ):
@@ -105,15 +106,15 @@ async def git_webhook_handler(
 
     if message_type == WebhookMessageType.ISSUE_COMMENT:
         # We need a quick return
-        asyncio.create_task(IssueCommentHandler().handle(typed_message))
+        asyncio.create_task(IssueCommentHandler().handle(typed_message, workspace_id))
         return JSONResponse(status_code=200, content={"status": "ok"})
 
     if message_type == WebhookMessageType.PR_COMMENT:
-        asyncio.create_task(PRCommentHandler().handle(typed_message))
+        asyncio.create_task(PRCommentHandler().handle(typed_message, workspace_id))
         return JSONResponse(status_code=200, content={"status": "ok"})
 
     if message_type == WebhookMessageType.PR_REVIEW:
-        asyncio.create_task(PRReviewHandler().handle(typed_message))
+        asyncio.create_task(PRReviewHandler().handle(typed_message, workspace_id))
         return JSONResponse(status_code=200, content={"status": "ok"})
 
     logger.warning(f"No handler for message type {message_type}")

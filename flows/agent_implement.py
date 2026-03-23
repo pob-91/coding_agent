@@ -7,6 +7,7 @@ from typing import Any, Iterable, Literal
 
 from openai import OpenAI
 
+from data.db_handler import DBHandler
 from data.open_router import OpenRouterHandler
 from model.issue import Issue
 from model.pull_review_comment import PullReviewComment
@@ -98,7 +99,13 @@ async def run_agent_implement(
     agent_command: str,
     repository: Repository,
     source: ImplementationSource,
+    workspace_id: str,
 ) -> None:
+    workspace_config = DBHandler.get_workspace_config(workspace_id)
+    if workspace_config is None:
+        logger.error(f"No workspace config found for workspace_id: {workspace_id}")
+        return
+
     client = OpenAI(
         base_url="https://openrouter.ai/api/v1",
         api_key=os.getenv("OPEN_ROUTER_API_KEY"),
@@ -147,7 +154,7 @@ async def run_agent_implement(
 
         response = await asyncio.to_thread(
             client.responses.create,
-            model=OpenRouterHandler.get_agent_model(),
+            model=OpenRouterHandler.get_agent_model(workspace_config.agent_model),
             tools=issue_tools,
             input=messages,
         )

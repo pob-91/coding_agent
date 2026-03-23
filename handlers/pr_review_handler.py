@@ -11,7 +11,7 @@ logger = get_logger(__name__)
 
 
 class PRReviewHandler(BaseHandler):
-    async def handle(self, data: WebhookMessage) -> None:
+    async def handle(self, data: WebhookMessage, workspace_id: str) -> None:
         review_event: PRReview = data  # type: ignore[assignment]
 
         repo_url = prep_url(review_event.repository.url)
@@ -44,6 +44,7 @@ class PRReviewHandler(BaseHandler):
                 branch=review_event.pull_request.head.ref,
                 code_contexts=[ask_comment],
                 source_comment_url=ask_comment.html_url,
+                workspace_id=workspace_id,
             )
 
         for update_comment in update_comments:
@@ -67,4 +68,5 @@ class PRReviewHandler(BaseHandler):
                         code_contexts=[update_comment],
                     ),
                 ),
+                workspace_id=workspace_id,
             )
