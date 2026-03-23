@@ -73,11 +73,43 @@ Audio files are transcribed and processed as text input alongside any accompanyi
 
 ### Slack Integration
 
-This coding agent can optionally integrate with Slack for notifications and interactions. Slack integration is optional. See the "Environment Variables" section for configuration details.
+This coding agent integrates with Slack for notifications and interactions. Slack configuration is required for the application to function. See the "Environment Variables" section for configuration details.
 
 ### Database (CouchDB)
 
 CouchDB is the required database for this application. The following environment variables must be configured: `DB_URL`, `DB_USER`, `DB_PASSWORD`, and `DB_NAME`. See the "Environment Variables" section for CouchDB configuration details.
+
+### Configuring Git Webhooks
+
+The Git webhook must include the Slack workspace ID in the path: `/{workspace_id}/gitea/events`.
+
+For example, if your Slack workspace ID is `T123456`, the webhook URL becomes `https://your-domain.com/T123456/gitea/events`.
+
+This is required for Slack integration to work properly.
+
+### Environment Variables
+
+| Name | Where it's used | Purpose / description |
+| :-- | :-- | :-- |
+| `REPO_BASE_URL` | `handlers/planning_handler.py:443,451` | Base URL for the Git repository. Used to build clone URLs and repository API endpoints. |
+| `AGENT_TOKEN` | `utils/repo.py:23` | Git authentication token used in clone URLs. |
+| `AGENT_SECRET` | `main.py:40,48,53,56,70` | Bearer token used to authenticate incoming webhook requests. |
+| `AGENT_USERNAME` | `utils/repo.py:23` | Git username used in clone URLs with `AGENT_TOKEN`. |
+| `OPEN_ROUTER_API_KEY` | `utils/transcribe.py:27`, `flows/run_planning_compaction.py:47`, `data/open_router.py:33`, `flows/agent_ask.py:67`, `flows/agent_implement.py:111`, `handlers/planning_handler.py:188` | API key used to authenticate requests to OpenRouter for chat and transcription calls. |
+| `AGENT_MODELS` | `data/open_router.py:20` | Comma-separated list of available agent/coding models. |
+| `PLANNING_MODELS` | `data/open_router.py:14` | Comma-separated list of available planning models. |
+| `AUDIO_MODELS` | `data/open_router.py:26` | Comma-separated list of available audio transcription models. |
+| `DB_URL` | `data/db_handler.py:239` | CouchDB host and port used to construct the database base URL. |
+| `DB_USER` | `data/db_handler.py:243` | CouchDB username used for database authentication. |
+| `DB_PASSWORD` | `data/db_handler.py:243` | CouchDB password used for database authentication. |
+| `DB_NAME` | `data/db_handler.py:47,64,81,102,130,168,196` | CouchDB database name used for storing workspace, channel, and message data. |
+| `SLACK_SIGNING_SECRET` | `utils/slack.py:16` | Slack signing secret used to verify Slack event request signatures. |
+| `SLACK_CLIENT_ID` | `main.py:157` | Slack OAuth client ID used during workspace installation. |
+| `SLACK_CLIENT_SECRET` | `main.py:158` | Slack OAuth client secret used during workspace installation. |
+| `ADMIN_SECRET` | `main.py:179,182,196` | Bearer token used to protect admin endpoints. |
+| `COMPACT_ON_POST` | `handlers/planning_handler.py:420` | Enables automatic compaction after a successful post when set to `true`. |
+
+Slack configuration is required: `SLACK_SIGNING_SECRET`, `SLACK_CLIENT_ID`, and `SLACK_CLIENT_SECRET` must be set for the application to function.
 
 ### Environment Variables
 
