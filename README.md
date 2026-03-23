@@ -89,25 +89,25 @@ This is required for Slack integration to work properly.
 
 ### Environment Variables
 
-| Name | Where it's used | Purpose / description |
+| Name | Description | Is Required |
 | :-- | :-- | :-- |
-| `REPO_BASE_URL` | `handlers/planning_handler.py:443,451` | Base URL for the Git repository. Used to build clone URLs and repository API endpoints. |
-| `AGENT_TOKEN` | `utils/repo.py:23` | Git authentication token used in clone URLs. |
-| `AGENT_SECRET` | `main.py:40,48,53,56,70` | Bearer token used to authenticate incoming webhook requests. |
-| `AGENT_USERNAME` | `utils/repo.py:23` | Git username used in clone URLs with `AGENT_TOKEN`. |
-| `OPEN_ROUTER_API_KEY` | `utils/transcribe.py:27`, `flows/run_planning_compaction.py:47`, `data/open_router.py:33`, `flows/agent_ask.py:67`, `flows/agent_implement.py:111`, `handlers/planning_handler.py:188` | API key used to authenticate requests to OpenRouter for chat and transcription calls. |
-| `AGENT_MODELS` | `data/open_router.py:20` | Comma-separated list of available agent/coding models. |
-| `PLANNING_MODELS` | `data/open_router.py:14` | Comma-separated list of available planning models. |
-| `AUDIO_MODELS` | `data/open_router.py:26` | Comma-separated list of available audio transcription models. |
-| `DB_URL` | `data/db_handler.py:239` | CouchDB host and port used to construct the database base URL. |
-| `DB_USER` | `data/db_handler.py:243` | CouchDB username used for database authentication. |
-| `DB_PASSWORD` | `data/db_handler.py:243` | CouchDB password used for database authentication. |
-| `DB_NAME` | `data/db_handler.py:47,64,81,102,130,168,196` | CouchDB database name used for storing workspace, channel, and message data. |
-| `SLACK_SIGNING_SECRET` | `utils/slack.py:16` | Slack signing secret used to verify Slack event request signatures. |
-| `SLACK_CLIENT_ID` | `main.py:157` | Slack OAuth client ID used during workspace installation. |
-| `SLACK_CLIENT_SECRET` | `main.py:158` | Slack OAuth client secret used during workspace installation. |
-| `ADMIN_SECRET` | `main.py:179,182,196` | Bearer token used to protect admin endpoints. |
-| `COMPACT_ON_POST` | `handlers/planning_handler.py:420` | Enables automatic compaction after a successful post when set to `true`. |
+| `REPO_BASE_URL` | Base URL for the Git repository. Used to build clone URLs and repository API endpoints. | Yes |
+| `AGENT_TOKEN` | Git authentication token used in clone URLs. | Yes |
+| `AGENT_SECRET` | Bearer token used to authenticate incoming webhook requests. | Yes |
+| `AGENT_USERNAME` | Git username used in clone URLs with `AGENT_TOKEN`. | Yes |
+| `OPEN_ROUTER_API_KEY` | API key used to authenticate requests to OpenRouter for chat and transcription calls. | Yes |
+| `AGENT_MODELS` | Comma-separated list of available agent/coding models. | No |
+| `PLANNING_MODELS` | Comma-separated list of available planning models. | No |
+| `AUDIO_MODELS` | Comma-separated list of available audio transcription models. | No |
+| `DB_URL` | CouchDB host and port used to construct the database base URL. | Yes |
+| `DB_USER` | CouchDB username used for database authentication. | Yes |
+| `DB_PASSWORD` | CouchDB password used for database authentication. | Yes |
+| `DB_NAME` | CouchDB database name used for storing workspace, channel, and message data. | Yes |
+| `SLACK_SIGNING_SECRET` | Slack signing secret used to verify Slack event request signatures. | No |
+| `SLACK_CLIENT_ID` | Slack OAuth client ID used during workspace installation. | No |
+| `SLACK_CLIENT_SECRET` | Slack OAuth client secret used during workspace installation. | No |
+| `ADMIN_SECRET` | Bearer token used to protect admin endpoints. | No |
+| `COMPACT_ON_POST` | Enables automatic compaction after a successful post when set to `true`. | No |
 
 Slack configuration is required: `SLACK_SIGNING_SECRET`, `SLACK_CLIENT_ID`, and `SLACK_CLIENT_SECRET` must be set for the application to function.
 
