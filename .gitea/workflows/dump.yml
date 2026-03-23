@@ -1,0 +1,56 @@
+name: Dump All Variables
+
+on:
+  push:
+    branches:
+      - "*" # run on every branch push
+    tags:
+      - "*" # also run on any tag push
+
+jobs:
+  dump-vars:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Dump Gitea context variables
+        run: |
+          echo "===== GITEA CONTEXT ====="
+          echo "gitea.event_name       = ${{ gitea.event_name }}"
+          echo "gitea.ref              = ${{ gitea.ref }}"
+          echo "gitea.ref_name         = ${{ gitea.ref_name }}"
+          echo "gitea.repository       = ${{ gitea.repository }}"
+          echo "gitea.repository_owner = ${{ gitea.repository_owner }}"
+          echo "gitea.actor            = ${{ gitea.actor }}"
+          echo "gitea.workspace        = ${{ gitea.workspace }}"
+
+      - name: Dump GitHub context variables
+        run: |
+          echo "===== GITHUB CONTEXT ====="
+          echo "github.ref           = ${{ github.ref }}"
+          echo "github.ref_name      = ${{ github.ref_name }}"
+          echo "github.sha           = ${{ github.sha }}"
+          echo "github.repository    = ${{ github.repository }}"
+          echo "github.repository_owner = ${{ github.repository_owner }}"
+          echo "github.actor         = ${{ github.actor }}"
+          echo "github.server_url    = ${{ github.server_url }}"
+
+      - name: Dump runner environment variables
+        run: |
+          echo "===== RUNNER ENVIRONMENT ====="
+          env
+
+      - name: Dump all secrets (names only, values masked)
+        run: |
+          echo "===== SECRETS (names only) ====="
+          echo "Available secrets (masked values):"
+          for s in REGISTRY_USER REGISTRY_PASSWORD GITHUB_TOKEN; do
+            echo "$s = ***"
+          done
+
+      - name: Dump shell variables (for debugging)
+        run: |
+          echo "===== SHELL VARIABLES ====="
+          set
