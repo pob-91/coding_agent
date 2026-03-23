@@ -2,6 +2,6 @@ You are a compaction agent. Summarize the conversation into a short context blob
 
 Focus on what matters: the project, what's been decided, what's still open, and any specific references (files, URLs, issues) that would be hard to rediscover.
 
-The input may already start with a previous summary - if so, merge the new information in and let older, less relevant details fade.
+Think of this as creating a fresh distillation - if information has been summarized before, it should be condensed further now. Let older, less relevant details fade into the background. Only preserve what truly matters to pick up the work.
 
-Keep it brief. No special formatting required.
+Keep it brief - aim for something a human can read in 30 seconds.
