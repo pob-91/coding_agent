@@ -25,6 +25,7 @@ jobs:
           echo "gitea.repository_owner = ${{ gitea.repository_owner }}"
           echo "gitea.actor            = ${{ gitea.actor }}"
           echo "gitea.workspace        = ${{ gitea.workspace }}"
+          echo "gitea.server_url        = ${{ gitea.server_url }}"
 
       - name: Dump GitHub context variables
         run: |

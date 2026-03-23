@@ -18,7 +18,7 @@ jobs:
 
       - name: Log in to gitea registry
         run: |
-          echo "${{ secrets.GITHUB_TOKEN }}" | docker login "${{ vars.REPO_URL }}" -u "${{ gitea.actor }}" --password-stdin
+          echo "${{ secrets.GITHUB_TOKEN }}" | docker login "${{ gitea.server_url }}" -u "${{ gitea.actor }}" --password-stdin
 
       - name: Set up Docker Buildx
         run: docker buildx create --use
@@ -27,5 +27,5 @@ jobs:
         run: |
           docker buildx build \
             --push \
-            --tag ${{ vars.REPO_URL }}/${{ gitea.repository_owner }}/coding-agent:${{ gitea.ref_name }} \
+            --tag ${{ gitea.server_url }}/${{ gitea.repository_owner }}/coding-agent:${{ gitea.ref_name }} \
             .
