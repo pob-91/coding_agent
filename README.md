@@ -1,8 +1,43 @@
 # Coding Agent
 
-I need to lean into LLM agents coding for me or leave the industry.
+### Overview
 
-If I don't enjoy this experience then I should quit tech.
+This is an experiment in completely hands off coding.
+
+- On the go.
+- Write.
+- Speak.
+- Snap (coming soon).
+
+### Getting Set Up
+
+This coding agent is built around the following flow:
+
+- Plan a feature with a chat app (currently Slack but could be another with some tweaking)
+- Planning agent posts an issue on your git repo (currently Gitea but could become GitHub or GitLab e.t.c with some tweaking)
+- User comments on the issue with one of the supported commands (see below)
+- Coding agent picks up the issue and creates a PR
+- User can comment on the PR with ask or update commands
+- When the PR is completed to the user's satisfaction, merge it in and ahoy!
+
+If you want to use this project as is then you need to:
+
+- Host this agent on your infra somewhere, all you need is a public endpoint into the coding agent (e.g. AWS LoadBalancer or K8s ingress)
+- Create a slack app and connect it to your workspace
+- Register your slack app for the following event susbscriptions with the url `https://your-domain.com/slack/events`:
+  - channel_id_changed
+  - file_created
+  - message.channels
+- Register your repo (assuming Gitea) for the following webhooks with the url `https://your-domain.com/{SLACK_TEAM_ID}/gitea/events`:
+  - Issue Comment
+  - Pull Request Comment
+  - Pull Request Reviewed
+
+Then you should be good to go. Ensure you set the environment variables required below and set the auth header for Gitea (Slack has it's own OAuth flow that is handled once connected). The Gitea header is in the form `Bearer {token}` where token is set as an env var. 
+
+> Other Inputs
+
+The agent workflow is not currently set up to support input from any other sources but it would not take much to support WhatsApp, Text, Telegram e.t.c and also integrate with GitHub, GitLab e.t.c. If you would like this then raise an issue or even better, raise a PR!
 
 ### Commands
 
@@ -111,31 +146,10 @@ This is required for Slack integration to work properly.
 
 Slack configuration is required: `SLACK_SIGNING_SECRET`, `SLACK_CLIENT_ID`, and `SLACK_CLIENT_SECRET` must be set for the application to function.
 
-### Environment Variables
-
-| Name | Description | Required |
-| :------------------ | :-------------------------------------------------------------------------------------------------------------------------------------------------- | :------- |
-| `REPO_BASE_URL` | The base URL for the Git repository (e.g., `github.com` or `gitea.example.com`). Used to construct clone URLs and API endpoints. | Yes |
-| `AGENT_TOKEN` | The authentication token for the agent to access repositories. Used with `AGENT_USERNAME` for Git operations. | Yes |
-| `AGENT_USERNAME` | The username for the agent to access repositories. Used with `AGENT_TOKEN` for Git operations. | Yes |
-| `AGENT_SECRET` | The secret token for webhook authentication. Used to verify incoming webhook requests. | Yes |
-| `OPEN_ROUTER_API_KEY` | The API key for OpenRouter (LLM API provider). Used to authenticate with the OpenRouter API for model inference. | Yes |
-| `AGENT_MODEL` | The model to use for coding tasks. | Yes |
-| `PLANNING_MODEL` | The model to use for planning tasks. | Yes |
-| `ADMIN_SECRET` | The secret token for admin endpoints. Used to verify admin API requests. | No |
-| `SLACK_SIGNING_SECRET` | The signing secret for Slack API requests. | No |
-| `SLACK_CLIENT_ID` | The client ID for your Slack app. | No |
-| `SLACK_CLIENT_SECRET` | The client secret for your Slack app. | No |
-| `DB_URL` | The URL for the CouchDB instance (e.g., `main-db:5984`). | Yes |
-| `DB_USER` | The username for CouchDB authentication. | Yes |
-| `DB_PASSWORD` | The password for CouchDB authentication. | Yes |
-| `DB_NAME` | The name of the database to use within CouchDB. | Yes |
-
 ### Future Features
 
 - If you want to naturally chat with the agent then `openai/gpt-audio` is the way forward. However, it is verrrryy expensive.
 - Run tests function (will need a run_tests.sh file, or Makefile command) -> return is success or failure with a message
 - Run linting function (will need a run_lint.sh file, or Makefile command) -> return is success or failure with a message
-- If performance is not 100% then try the planner/coder model where 1 model (maybe a thinking one) plans the approach to the solution and another model (a coding specific one) calls the replace, insert and delete functions
 - Add guardrails in the form of another LLM that checks output and provides feedback before the patch is accepted
 - Add benchmarks for code complexity, performance e.t.c and ask the model to optimise for it
