@@ -201,6 +201,8 @@ class PlanningHandler:
             )
 
             has_tool_calls = False
+            compact = False
+
             for item in response.output:
                 logger.info(f"Handling response type of {item.type}")
 
@@ -340,20 +342,15 @@ class PlanningHandler:
                 elif item.name == "compat_chat":
                     send_slack_message(
                         channel_id=channel_id,
-                        text=f"_AGENT STATUS: compacting {len(messages) - 3} chat messages..._",
+                        text=f"_AGENT STATUS: compaction of {len(messages) - 3} chat messages queued..._",
                         token=workspace_config.access_token,
                     )
-                    tool_response = compact_chat(
-                        item,
-                        channel_id=channel_id,
-                        configured_model=workspace_config.planning_model,
-                    )
-                    send_slack_message(
-                        channel_id=channel_id,
-                        text="_AGENT STATUS: Completed._",
-                        token=workspace_config.access_token,
-                    )
-                    save = False
+                    compact = True
+                    tool_response = {
+                        "type": "function_call_output",
+                        "call_id": item.call_id,
+                        "output": "Chat compaction queued.",
+                    }
                 elif item.name == "get_configured_model":
                     send_slack_message(
                         channel_id=channel_id,
@@ -394,31 +391,7 @@ class PlanningHandler:
                         token=workspace_config.access_token,
                     )
                     success, tool_response = post_issue(args, item, repo_url)
-
-                    if (
-                        success
-                        and os.getenv("COMPACT_ON_POST", "false").lower().strip()
-                        == "true"
-                    ):
-                        # After we successfully post an issue, we assume that the conversation has reached a natural pause
-                        # So we produce a compacted message and archive old messages
-                        logger.info(
-                            "Successfully posted an issue so running compaction."
-                        )
-                        send_slack_message(
-                            channel_id=channel_id,
-                            text="_SYSTEM STATUS: Running compaction process please wait..._",
-                            token=workspace_config.access_token,
-                        )
-                        compacted = await run_planning_compaction(
-                            channel_id=channel_id,
-                            configured_model=workspace_config.planning_model,
-                        )
-                        send_slack_message(
-                            channel_id=channel_id,
-                            text=f"_SYSTEM STATUS: Compacted channel.\n\n{compacted}",
-                            token=workspace_config.access_token,
-                        )
+                    compact = success
                 else:
                     save = False
                     logger.warning(
@@ -441,6 +414,28 @@ class PlanningHandler:
             if not has_tool_calls:
                 logger.info("No tool was called in the last loop so stopping.")
                 break
+
+            if (
+                compact
+                and os.getenv("COMPACT_ON_POST", "false").lower().strip() == "true"
+            ):
+                # After we successfully post an issue, we assume that the conversation has reached a natural pause
+                # So we produce a compacted message and archive old messages
+                logger.info("Successfully posted an issue so running compaction.")
+                send_slack_message(
+                    channel_id=channel_id,
+                    text="_SYSTEM STATUS: Running compaction process please wait..._",
+                    token=workspace_config.access_token,
+                )
+                compacted = await run_planning_compaction(
+                    channel_id=channel_id,
+                    configured_model=workspace_config.planning_model,
+                )
+                send_slack_message(
+                    channel_id=channel_id,
+                    text=f"_SYSTEM STATUS: Compacted channel.\n\n{compacted}",
+                    token=workspace_config.access_token,
+                )
 
     def _create_clone_url(self, repo_name: str) -> str:
         return prep_url(
