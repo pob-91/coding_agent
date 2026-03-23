@@ -6,6 +6,7 @@ from typing import Any, Iterable
 
 from openai import OpenAI
 
+from data.db_handler import DBHandler
 from data.open_router import OpenRouterHandler
 from model.pull_review_comment import PullReviewComment
 from model.repository import Repository
@@ -52,9 +53,15 @@ async def run_agent_ask(
     repository: Repository,
     pr_number: int,
     branch: str,
+    workspace_id: str,
     code_contexts: list[PullReviewComment] | None = None,
     source_comment_url: str | None = None,
 ) -> None:
+    workspace_config = DBHandler.get_workspace_config(workspace_id)
+    if workspace_config is None:
+        logger.error(f"No workspace config found for workspace_id: {workspace_id}")
+        return
+
     client = OpenAI(
         base_url="https://openrouter.ai/api/v1",
         api_key=os.getenv("OPEN_ROUTER_API_KEY"),
@@ -108,7 +115,7 @@ async def run_agent_ask(
             response = await asyncio.to_thread(
                 client.responses.create,
                 model=OpenRouterHandler.get_planning_model(
-                    configured_model=None,
+                    configured_model=workspace_config.planning_model if workspace_config else None,
                 ),  # Use the planning model as is probably better at reasoning
                 tools=ask_tools,
                 input=messages,

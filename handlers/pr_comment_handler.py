@@ -10,7 +10,7 @@ logger = get_logger(__name__)
 
 
 class PRCommentHandler(BaseHandler):
-    async def handle(self, data: WebhookMessage) -> None:
+    async def handle(self, data: WebhookMessage, workspace_id: str) -> None:
         pr_comment: PRComment = data  # type: ignore[assignment]
 
         body = pr_comment.comment.body.strip()
@@ -29,6 +29,7 @@ class PRCommentHandler(BaseHandler):
                 pr_number=pr_comment.pull_request.number,
                 branch=pr_comment.pull_request.head.ref,
                 source_comment_url=pr_comment.comment.html_url,
+                workspace_id=workspace_id,
             )
             return
 
@@ -53,6 +54,7 @@ class PRCommentHandler(BaseHandler):
                         code_contexts=None,
                     ),
                 ),
+                workspace_id=workspace_id,
             )
             return
 

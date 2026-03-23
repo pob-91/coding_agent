@@ -10,7 +10,7 @@ _COMMAND = "/agent-implement"
 
 
 class IssueCommentHandler(BaseHandler):
-    async def handle(self, data: WebhookMessage) -> None:
+    async def handle(self, data: WebhookMessage, workspace_id: str) -> None:
         issue_comment: IssueComment = data  # type: ignore[assignment]
 
         body = issue_comment.comment.body.strip()
@@ -33,4 +33,5 @@ class IssueCommentHandler(BaseHandler):
                 issue=issue_comment.issue,
                 pr=None,
             ),
+            workspace_id=workspace_id,
         )
