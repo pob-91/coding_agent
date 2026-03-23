@@ -162,19 +162,17 @@ def configure_model(
             ),
         }
 
-    config = WorkspaceConfig(
-        **workspace_config.model_dump(mode="json"),
-    )
+    updates: dict[str, Any] = {}
 
     if args["model_type"] == "planning":
-        config.planning_model = args["model_name"]
+        updates["planning_model"] = args["model_name"]
     elif args["model_type"] == "coding":
-        config.agent_model = args["model_name"]
+        updates["agent_model"] = args["model_name"]
     elif args["model_type"] == "audio":
-        config.audio_model = args["model_name"]
+        updates["audio_model"] = args["model_name"]
 
     try:
-        DBHandler.write_model(config)
+        DBHandler.update_model(workspace_config, updates)
     except Exception as e:
         return {
             "type": "function_call_output",

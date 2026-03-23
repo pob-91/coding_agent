@@ -1,6 +1,6 @@
 import json
 import os
-from typing import Tuple
+from typing import Any, Tuple
 
 import requests
 
@@ -30,6 +30,17 @@ class DBHandler:
             return DBHandler._write_channel_message(model)
 
         return DBHandler._write_generic_model(model)
+
+    @staticmethod
+    def update_model(model: BaseDBModel, updates: dict[str, Any]) -> None:
+        if isinstance(model, WorkspaceConfig):
+            return DBHandler._update_generic_model(model.team_id, updates)
+        if isinstance(model, ChannelConfig):
+            return DBHandler._update_generic_model(model.channel_id, updates)
+        if isinstance(model, ChannelMessage):
+            return DBHandler._update_generic_model(model.message_id, updates)
+
+        raise Exception(f"Cannot update model of type: {type(model)}")
 
     @staticmethod
     def get_workspace_config(team_id: str) -> WorkspaceConfig | None:
@@ -348,3 +359,26 @@ class DBHandler:
             raise Exception(
                 f"Failed to create model: {response.status_code} - {response.text}"
             )
+
+    @staticmethod
+    def _update_generic_model(id: str, updates: dict[str, Any]) -> None:
+        base_url = f"{DBHandler._get_db_url()}/{os.getenv('DB_NAME')}"
+        get_response = requests.get(
+            url=f"{base_url}/{id}",
+            auth=DBHandler._get_db_auth(),
+        )
+
+        if get_response.status_code != 200:
+            raise Exception(f"Failed to get model: {get_response.status_code}")
+
+        existing_doc = get_response.json()
+        merged_doc = {**existing_doc, **updates}
+
+        update_response = requests.put(
+            url=f"{base_url}/{id}",
+            auth=DBHandler._get_db_auth(),
+            json=merged_doc,
+        )
+
+        if update_response.status_code not in (200, 201, 202):
+            raise Exception(f"Failed to update model: {update_response.status_code}")
