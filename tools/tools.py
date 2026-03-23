@@ -416,6 +416,22 @@ planning_tools: Iterable[Any] = [
     {
         "type": "function",
         "name": "list_available_models",
+    {
+        "type": "function",
+        "name": "model_info",
+        "description": "Get information about a specific AI model including pricing, context length, and capabilities.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "model_id": {
+                    "type": "string",
+                    "description": "The model ID to look up, e.g. 'anthropic/claude-opus-4.6'.",
+                },
+            },
+            "required": ["model_id"],
+            "additionalProperties": False,
+        },
+    },
         "description": "List all available models for a given agentic task.",
         "parameters": {
             "type": "object",

@@ -21,6 +21,7 @@ from tools.model_config import (
     get_configured_model,
     list_available_models,
 )
+from tools.model_info import model_info
 from tools.post_issue import post_issue
 from tools.read_file import read_file
 from tools.search import search
