@@ -53,16 +53,14 @@ async def run_agent_ask(
     repository: Repository,
     pr_number: int,
     branch: str,
+    workspace_id: str,
     code_contexts: list[PullReviewComment] | None = None,
     source_comment_url: str | None = None,
-    workspace_id: str | None = None,
 ) -> None:
-    workspace_config = None
-    if workspace_id is not None:
-        workspace_config = DBHandler.get_workspace_config(workspace_id)
-        if workspace_config is None:
-            logger.error(f"No workspace config found for workspace_id: {workspace_id}")
-            return
+    workspace_config = DBHandler.get_workspace_config(workspace_id)
+    if workspace_config is None:
+        logger.error(f"No workspace config found for workspace_id: {workspace_id}")
+        return
 
     client = OpenAI(
         base_url="https://openrouter.ai/api/v1",
