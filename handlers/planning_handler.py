@@ -372,6 +372,16 @@ class PlanningHandler:
                         args,
                         item,
                     )
+                elif item.name == "model_info":
+                    send_slack_message(
+                        channel_id=channel_id,
+                        text=f"_AGENT STATUS: getting info for model {args.get('model_id', '')}_",
+                        token=workspace_config.access_token,
+                    )
+                    tool_response = model_info(
+                        args,
+                        item,
+                    )
                 elif item.name == "configure_model":
                     send_slack_message(
                         channel_id=channel_id,
