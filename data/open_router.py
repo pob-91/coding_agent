@@ -53,13 +53,23 @@ class OpenRouterHandler:
 
         payload: dict[str, Any] = response.json()
         models = payload.get("data", [])
+        allowed_models = {
+            model_id
+            for env_key in ("AGENT_MODELS", "PLANNING_MODELS", "AUDIO_MODELS")
+            for model_id in os.getenv(env_key, "").split(",")
+            if model_id
+        }
 
         cache: dict[str, ModelInfo] = {}
         for model in models:
+            model_id = model.get("id")
+            if model_id not in allowed_models:
+                continue
+
             top_provider = model.get("top_provider")
             pricing_data = model.get("pricing")
-            cache[model["id"]] = ModelInfo(
-                id=model["id"],
+            cache[model_id] = ModelInfo(
+                id=model_id,
                 name=model.get("name"),
                 description=model.get("description"),
                 pricing=Pricing(
