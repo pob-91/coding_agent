@@ -1,4 +1,5 @@
 import json
+import os
 from typing import Any
 
 from data.open_router import OpenRouterHandler
@@ -15,6 +16,23 @@ def model_info(args: dict, item: Any) -> dict:
             "call_id": item.call_id,
             "output": json.dumps(
                 {"error": "model_id argument not given to function call model_info"}
+            ),
+        }
+
+    allowed_models = {
+        model_id
+        for env_key in ("AGENT_MODELS", "PLANNING_MODELS", "AUDIO_MODELS")
+        for model_id in os.getenv(env_key, "").split(",")
+        if model_id
+    }
+    if args["model_id"] not in allowed_models:
+        return {
+            "type": "function_call_output",
+            "call_id": item.call_id,
+            "output": json.dumps(
+                {
+                    "error": f"Invalid model id: {args['model_id']} not one of the available models. Use the list_available_models tool to discover available models.",
+                }
             ),
         }
 
