@@ -91,8 +91,8 @@ class OpenRouterHandler:
                 )
                 if isinstance(top_provider, dict)
                 else None,
-                input_modalities=model.get("input_modalities", []),
-                output_modalities=model.get("output_modalities", []),
+                input_modalities=model.get("architecture", {}).get("input_modalities", []),
+                output_modalities=model.get("architecture", {}).get("output_modalities", []),
             )
 
         OpenRouterHandler._models_cache = cache

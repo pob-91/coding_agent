@@ -1,4 +1,4 @@
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
 class Pricing(BaseModel):
@@ -28,3 +28,10 @@ class ModelInfo(BaseModel):
     top_provider: TopProvider | None = None
     input_modalities: list[str] = Field(default_factory=list)
     output_modalities: list[str] = Field(default_factory=list)
+
+    @field_validator("input_modalities", "output_modalities", mode="before")
+    @classmethod
+    def _default_modalities(cls, value):
+        if value is None:
+            return []
+        return value
