@@ -1,5 +1,4 @@
 import json
-import os
 from typing import Any
 
 from data.open_router import OpenRouterHandler
@@ -19,12 +18,7 @@ def model_info(args: dict, item: Any) -> dict:
             ),
         }
 
-    allowed_models = {
-        model_id
-        for env_key in ("AGENT_MODELS", "PLANNING_MODELS", "AUDIO_MODELS")
-        for model_id in os.getenv(env_key, "").split(",")
-        if model_id
-    }
+    allowed_models = OpenRouterHandler.get_all_possible_models()
     if args["model_id"] not in allowed_models:
         return {
             "type": "function_call_output",

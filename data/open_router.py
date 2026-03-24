@@ -44,6 +44,15 @@ class OpenRouterHandler:
 
         return OpenRouterHandler._models_cache.get(model_id)
 
+    @staticmethod
+    def get_all_possible_models() -> set[str]:
+        return {
+            model_id
+            for env_key in ("AGENT_MODELS", "PLANNING_MODELS", "AUDIO_MODELS")
+            for model_id in os.getenv(env_key, "").split(",")
+            if model_id
+        }
+
     # Private
 
     @staticmethod
@@ -53,12 +62,7 @@ class OpenRouterHandler:
 
         payload: dict[str, Any] = response.json()
         models = payload.get("data", [])
-        allowed_models = {
-            model_id
-            for env_key in ("AGENT_MODELS", "PLANNING_MODELS", "AUDIO_MODELS")
-            for model_id in os.getenv(env_key, "").split(",")
-            if model_id
-        }
+        allowed_models = OpenRouterHandler.get_all_possible_models()
 
         cache: dict[str, ModelInfo] = {}
         for model in models:
