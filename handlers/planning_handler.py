@@ -21,6 +21,7 @@ from tools.model_config import (
     get_configured_model,
     list_available_models,
 )
+from tools.model_info import model_info
 from tools.post_issue import post_issue
 from tools.read_file import read_file
 from tools.search import search
@@ -368,6 +369,16 @@ class PlanningHandler:
                         token=workspace_config.access_token,
                     )
                     tool_response = list_available_models(
+                        args,
+                        item,
+                    )
+                elif item.name == "model_info":
+                    send_slack_message(
+                        channel_id=channel_id,
+                        text=f"_AGENT STATUS: getting info for model {args.get('model_id', '')}_",
+                        token=workspace_config.access_token,
+                    )
+                    tool_response = model_info(
                         args,
                         item,
                     )
