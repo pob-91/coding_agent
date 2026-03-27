@@ -1,7 +1,12 @@
+import json
 import os
 import re
 
 from ripgrepy import Ripgrepy
+
+from utils.logger import get_logger
+
+logger = get_logger(__name__)
 
 
 def regex_search(
@@ -10,6 +15,8 @@ def regex_search(
     sub_path: str | None = None,
     result_limit: int = 20,
 ) -> list[dict]:
+    regex = regex.replace("\\n", "\\s+")
+
     try:
         re.compile(regex)
     except re.error as e:
@@ -27,7 +34,18 @@ def regex_search(
         path = os.path.join(path, sub_path)
 
     rg = Ripgrepy(regex, path)
-    result: list[dict] = rg.with_filename().line_number().json().run().as_dict
+
+    try:
+        result: list[dict] = rg.with_filename().line_number().json().run().as_dict
+    except json.JSONDecodeError as e:
+        logger.warning("ripgrep returned no parseable output for query: %s", regex)
+        return [
+            {
+                "type": "error",
+                "message": "error searching with regex",
+                "error": str(e),
+            }
+        ]
 
     results: list[dict] = []
 
