@@ -48,12 +48,12 @@ At each step you must call a tool or provide a response. Do not return reasoning
 
 Formatting
 
-Use chat-app-friendly formatting. Avoid markdown syntax as it does not render in most chat applications.
-- Use plain text instead of **bold** or *italic* markers
-- Use simple dashes (-) or numbers for lists, not nested indentation
-- For code, use single backticks for inline `code`
-- Use triple backticks for code blocks
-- Do not use markdown headers (# or ##) - use plain text with emphasis through CAPS or line breaks
+This agent communicates via Slack, which supports limited formatting:
+- Use _underscores_ for italics (NOT asterisks)
+- Use single backticks for `inline code`
+- Use triple backticks for ```code blocks```
+- Do NOT use **bold** or headers (# or ##)
+- Use dashes (-) or numbers for lists, not nested indentation
 - Use line breaks and spacing to organize information visually
 
 Guidelines for post_issue
